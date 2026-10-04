@@ -38,6 +38,9 @@ def test_concurrent_gradients_with_accumulation_bf16():
     cfg = tiny_model_cfg("B", d_model=128, n_heads=2, head_dim=64, max_seq_len=128, expert_hidden=96)
     torch.manual_seed(0)
     blk = ParallelBlock(cfg).cuda()
+    for p in blk.parameters():  # same initialisation as the fp32 test (the experiment uses init_parameters)
+        if p.ndim > 1:
+            torch.nn.init.normal_(p, 0, 0.05)
     xs = [torch.randn(2, 128, 128, device="cuda") for _ in range(3)]
     res = {}
     for mode in ("reference", "concurrent"):
@@ -51,4 +54,5 @@ def test_concurrent_gradients_with_accumulation_bf16():
         res[mode] = {n: p.grad.detach().float().clone() for n, p in blk.named_parameters()}
     for n in res["reference"]:
         a, b = res["reference"][n], res["concurrent"][n]
+        assert torch.isfinite(a).all() and torch.isfinite(b).all(), n
         assert (a - b).norm() <= 1e-2 * (a.norm() + 1e-8), n

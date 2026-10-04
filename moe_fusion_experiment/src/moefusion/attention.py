@@ -82,7 +82,7 @@ def probe_attention_backend(backend: str, device: str = "cuda") -> Dict[str, obj
         out = causal_attention(q, k, v, backend)
         out.float().sum().backward()
         ref = F.scaled_dot_product_attention(q.float(), k.float(), v.float(), is_causal=True)
-        info["max_abs_err_vs_fp32"] = float((out.float() - ref).abs().max())
+        info["max_abs_err_vs_fp32"] = float((out.detach().float() - ref.detach()).abs().max())
         info["ok"] = bool(torch.isfinite(out).all()) and info["max_abs_err_vs_fp32"] < 5e-2
     except Exception as e:  # noqa: BLE001
         info["error"] = f"{type(e).__name__}: {e}"

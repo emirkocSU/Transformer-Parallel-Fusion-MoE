@@ -14,7 +14,7 @@ def test_balance_loss_uniform_equals_one():
         torch.nn.init.normal_(p, 0, 0.1)
     m(torch.randn(1, 64, 8))
     # with all-equal probabilities topk picks the same experts, so f is skewed but P is uniform -> loss = 1
-    assert abs(float(m.last_aux["balance_loss"]) - 1.0) < 1e-5
+    assert abs(float(m.last_aux["balance_loss"].detach()) - 1.0) < 1e-5
     assert abs(float(m.last_aux["entropy"]) - math.log(4)) < 1e-5
 
 
@@ -29,7 +29,7 @@ def test_balance_loss_penalises_imbalance():
     x = torch.randn(1, 64, 8)
     x[..., 0] = x[..., 0].abs() + 1
     m(x)
-    assert float(m.last_aux["balance_loss"]) > 1.5
+    assert float(m.last_aux["balance_loss"].detach()) > 1.5
 
 
 def test_utilization_stats_values():

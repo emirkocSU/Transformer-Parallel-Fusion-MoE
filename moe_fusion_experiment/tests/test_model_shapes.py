@@ -75,3 +75,22 @@ def test_matched_c_shares_non_expert_weights():
 def test_tied_embeddings():
     m = build_model(tiny_model_cfg("A"), 0)
     assert m.lm_head.weight is m.tok_emb.weight
+
+
+def test_construction_without_init_is_finite():
+    """Modules built WITHOUT init_parameters must never contain uninitialised memory (NaN/Inf garbage)."""
+    from moefusion.blocks import FusionBlock, ParallelBlock, SerialBlock
+    from moefusion.model import MoEFusionLM
+
+    cfg = tiny_model_cfg("C")
+    for mod in (MoEFusionLM(cfg), ParallelBlock(cfg), SerialBlock(cfg), FusionBlock(cfg)):
+        for n, p in mod.named_parameters():
+            assert torch.isfinite(p).all(), n
+
+
+def test_build_model_overwrites_default_init():
+    from moefusion.model import build_model
+
+    m = build_model(tiny_model_cfg("A"), seed=0)
+    w = m.blocks[0].moe.experts.w1.detach()
+    assert w.abs().sum() > 0 and abs(float(w.std()) - 0.02) < 0.005

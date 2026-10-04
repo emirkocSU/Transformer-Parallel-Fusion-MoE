@@ -34,9 +34,11 @@ class SwiGLUExperts(nn.Module):
     def __init__(self, n_experts: int, d_model: int, hidden: int):
         super().__init__()
         self.n_experts, self.d_model, self.hidden = n_experts, d_model, hidden
-        self.w1 = nn.Parameter(torch.empty(n_experts, d_model, hidden))  # gate
-        self.w3 = nn.Parameter(torch.empty(n_experts, d_model, hidden))  # up
-        self.w2 = nn.Parameter(torch.empty(n_experts, hidden, d_model))  # down (residual output)
+        # Zeros, never torch.empty: uninitialised memory can contain NaN/Inf. The experiment's real initialisation
+        # is moefusion.model.init_parameters (name-keyed, identical across architectures), which overwrites these.
+        self.w1 = nn.Parameter(torch.zeros(n_experts, d_model, hidden))  # gate
+        self.w3 = nn.Parameter(torch.zeros(n_experts, d_model, hidden))  # up
+        self.w2 = nn.Parameter(torch.zeros(n_experts, hidden, d_model))  # down (residual output)
 
     def forward_single(self, e: int, x: torch.Tensor) -> torch.Tensor:
         return (F.silu(x @ self.w1[e]) * (x @ self.w3[e])) @ self.w2[e]
