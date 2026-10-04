@@ -55,3 +55,29 @@ def test_matched_hidden_rule():
     assert r["rounded"] == 1536 and r["rel_mismatch"] == 0.0
     r2 = matched_hidden(1920, 12, 13)  # fusion every 8 -> 1 fusion layer
     assert r2["rounded"] % 64 == 0 and abs(r2["rel_mismatch"]) < 0.03
+
+
+def test_verdict_rule_single_and_two_seeds():
+    from moefusion.analysis import multi_seed_summary
+
+    def ps(dlist):
+        # minimal per-seed structure with B and C_same / C_matched final losses and paired stats
+        out = {}
+        for s, (d_same, d_match, lb) in dlist.items():
+            out[s] = {"runs": {"B": {"final_val_loss": lb, "train_seconds": 60},
+                               "C_same": {"final_val_loss": lb + d_same, "train_seconds": 70},
+                               "C_matched": {"final_val_loss": lb + d_match, "train_seconds": 65}},
+                      "paired": {"C_same_minus_B": {"mean": d_same, "ci95_normal": [d_same - 0.001, d_same + 0.001]},
+                                 "C_matched_minus_B": {"mean": d_match, "ci95_normal": [d_match - 0.001, d_match + 0.001]}},
+                      "common_wallclock": {"loss": {"B": lb, "C_same": lb + d_same, "C_matched": lb + d_match}}}
+        return out
+
+    one = multi_seed_summary(ps({42: (-0.005, -0.03, 5.0)}))
+    assert one["comparisons"]["C_same_minus_B"]["verdict"].startswith("approximately equal")
+    assert one["comparisons"]["C_matched_minus_B"]["verdict"].startswith("better")
+    assert one["fusion_verdict"].startswith("USEFUL") and "single seed" in one["fusion_verdict"]
+    small = multi_seed_summary(ps({42: (-0.012, 0.03, 5.0)}))  # CI excludes 0 but |dL| inside the 0.02 margin
+    assert small["comparisons"]["C_same_minus_B"]["verdict"].startswith("approximately equal")
+    assert small["comparisons"]["C_matched_minus_B"]["verdict"].startswith("worse")
+    two = multi_seed_summary(ps({42: (-0.03, 0.0, 5.0), 43: (0.01, 0.0, 5.05)}))  # direction flips between seeds
+    assert two["comparisons"]["C_same_minus_B"]["verdict"].startswith("inconclusive")

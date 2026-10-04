@@ -9,6 +9,13 @@ A controlled architecture experiment for one question:
 * How confounders are controlled: [`METHODOLOGY.md`](METHODOLOGY.md)
 * Verified literature: [`REFERENCES.md`](REFERENCES.md)
 
+## MAIN (100M tokens, seed 42) — current step
+
+Paste [`colab/MAIN_SINGLE_CELL.py`](colab/MAIN_SINGLE_CELL.py) into one Colab cell (A100) and run it; upload
+`moe_fusion_experiment.zip` (version 1.3.0) when asked. Runs B, C_same, C_matched, A for 100M tokens each (~3-3.3 h),
+then writes `/content/moe_fusion_runs/main/FINAL_REPORT.md` with the pre-registered fusion verdict
+(EXPERIMENT_SPEC Amendment 2). Results are mirrored to `MyDrive/moe_fusion_experiment/runs/main/`.
+
 ## Quick start (Google Colab, A100) — Hızlı başlangıç
 
 1. Runtime → Change runtime type → **A100 GPU**. Your prepared data should be in `/content/moe_data`

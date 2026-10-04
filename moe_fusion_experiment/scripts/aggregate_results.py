@@ -7,8 +7,10 @@ from _common import banner
 
 import numpy as np
 
+import re
+
 from moefusion.analysis import (EQUIV_MARGIN, SPEED_MARGIN, classify_diff, fairness_audit, load_run,
-                                loss_at_common_wallclock, paired_diff, time_to_targets)
+                                loss_at_common_wallclock, multi_seed_summary, paired_diff, time_to_targets)
 from moefusion.utils import read_json, write_json
 
 SHORT = {"A_serial": "A", "B_parallel": "B", "C_parallel_fusion_samewidth": "C_same", "C_parallel_fusion_matched": "C_matched"}
@@ -25,9 +27,20 @@ def _maybe(path):
     return read_json(p) if p.exists() else None
 
 
-def aggregate(root: Path) -> dict:
+def seeds_present(root: Path):
+    out = set()
+    for d in (root / "runs").glob("*_seed*"):
+        m = re.search(r"_seed(\d+)$", d.name)
+        if m and (d / "summary.json").exists():
+            out.add(int(m.group(1)))
+    return sorted(out)
+
+
+def aggregate(root: Path, seed=None) -> dict:
     runs, failed = {}, []
     for d in sorted((root / "runs").glob("*")):
+        if seed is not None and not d.name.endswith(f"_seed{seed}"):
+            continue
         r = load_run(d)
         if r is None:
             continue
@@ -108,7 +121,19 @@ def main():
     args = ap.parse_args()
     root = Path(args.root)
     banner(f"AGGREGATE RESULTS ({root})")
-    res = aggregate(root)
+    seeds = seeds_present(root)
+    if len(seeds) <= 1:
+        res = aggregate(root)
+        if seeds and res.get("runs"):
+            res["seeds"] = seeds
+            res["multi_seed"] = multi_seed_summary({seeds[0]: res})
+    else:
+        per_seed = {s: aggregate(root, s) for s in seeds}
+        res = dict(per_seed[seeds[0]])  # detailed sections show the first seed; multi-seed section summarises all
+        res["seeds"] = seeds
+        res["per_seed"] = {s: {k: per_seed[s].get(k) for k in ("runs", "paired", "common_wallclock", "time_to_target",
+                                                                "fairness_audit", "failed_runs")} for s in seeds}
+        res["multi_seed"] = multi_seed_summary(per_seed)
     res["mode"] = args.mode
     write_json(root / "results.json", res)
     from make_plots import make_all_plots
@@ -117,6 +142,13 @@ def main():
     plots = make_all_plots(root, res)
     write_report(root, res, plots)
     print(f"  results.json, {len(plots)} plots and FINAL_REPORT.md written to {root}")
+    ms = res.get("multi_seed")
+    if ms:
+        print(f"  VERDICT (seeds {ms['seeds']}; pre-registered rule):")
+        for k, v in ms["comparisons"].items():
+            print(f"    {k:24s} mean dL={v['mean_d']:+.4f} per seed {[round(x, 4) for x in v['per_seed_d'].values()]} "
+                  f"threshold {v['threshold']:.3f} -> {v['verdict']}")
+        print(f"  FUSION VERDICT: {ms['fusion_verdict']}")
     for k, v in res.get("paired", {}).items():
         print(f"  {k:24s} dL={v['mean']:+.4f}  95% CI [{v['ci95_normal'][0]:+.4f}, {v['ci95_normal'][1]:+.4f}]  -> {v['classification']}")
     fa = res.get("fairness_audit")

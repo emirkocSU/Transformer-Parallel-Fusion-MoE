@@ -211,12 +211,16 @@ def main():
                     help="where the resume checkpoint (5.7-7.0 GB, one per run, deleted when the run finishes) is written")
     ap.add_argument("--final-weights-to-drive", action="store_true",
                     help="write model_final_bf16.pt (~1 GB per run) to Drive instead of local disk")
+    ap.add_argument("--with-systems", action="store_true",
+                    help="MAIN: also re-run benchmark/profiling (default: skipped; measured in the pilot, token-independent)")
     ap.add_argument("--skip-benchmark", action="store_true")
     ap.add_argument("--skip-profile", action="store_true")
     args = ap.parse_args()
 
     t_start = time.time()
     models = args.models.split(",")
+    if args.mode == "main" and not args.with_systems:
+        args.skip_benchmark = args.skip_profile = True
     root = Path(args.out) / args.mode
     root.mkdir(parents=True, exist_ok=True)
     data_dir = Path(args.data_dir)

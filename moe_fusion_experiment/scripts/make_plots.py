@@ -39,11 +39,29 @@ def _style():
 
 
 def _runs(root: Path):
-    out = {}
+    """model -> run; with several seeds the curves are the seed MEAN, and '_band' holds the per-step min/max."""
+    groups = {}
     for d in sorted((root / "runs").glob("*")):
         r = load_run(d)
         if r and not r["failed"]:
-            out[SHORT.get(r["name"], r["name"])] = r
+            groups.setdefault(SHORT.get(r["name"], r["name"]), []).append(r)
+    out = {}
+    for k, rs in groups.items():
+        if len(rs) == 1:
+            out[k] = rs[0]
+            continue
+        n = min(len(r["periodic"]) for r in rs)
+        per = []
+        for i in range(n):
+            es = [r["periodic"][i] for r in rs]
+            per.append({"step": es[0]["step"], "tokens": es[0]["tokens"],
+                        "train_seconds": float(np.mean([e["train_seconds"] for e in es])),
+                        "val_loss": float(np.mean([e["val_loss"] for e in es])),
+                        "_lo": min(e["val_loss"] for e in es), "_hi": max(e["val_loss"] for e in es)})
+        m = min(len(r["train"]) for r in rs)
+        train = [{"tokens": rs[0]["train"][i]["tokens"], "lm_loss": float(np.mean([r["train"][i]["lm_loss"] for r in rs]))}
+                 for i in range(m)]
+        out[k] = {"name": rs[0]["name"], "periodic": per, "train": train, "n_seeds": len(rs)}
     return {k: out[k] for k in ORDER if k in out} | {k: v for k, v in out.items() if k not in ORDER}
 
 
@@ -57,6 +75,12 @@ def _curve_plot(runs, xkey, ykey, xlabel, ylabel, title, path, xscale=1.0, trans
             ys = transform(ys)
         # skip the step-0 point for readability of the converged region (it is ~ln V for all models)
         sl = slice(1, None)
+        if "_lo" in r["periodic"][-1]:  # several seeds: min-max band around the seed mean
+            lo = np.array([e["_lo"] for e in r["periodic"]])
+            hi = np.array([e["_hi"] for e in r["periodic"]])
+            if transform:
+                lo, hi = transform(lo), transform(hi)
+            ax.fill_between(xs[sl], lo[sl], hi[sl], color=COLOR.get(k, INK2), alpha=0.18, linewidth=0)
         ax.plot(xs[sl], ys[sl], STYLE.get(k, "-"), color=COLOR.get(k, INK2), lw=2, marker=MARK.get(k, "o"),
                 ms=4.5, markeredgecolor=SURFACE, markeredgewidth=1.0, label=LABEL.get(k, k))
         ends.append((xs[-1], ys[-1], k))

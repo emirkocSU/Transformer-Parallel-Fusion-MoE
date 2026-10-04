@@ -39,6 +39,31 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
         w("> **STATUS: PILOT.** One paired seed, ~25M tokens per model. The pre-registered purpose of the pilot is to detect "
           "catastrophic bugs and obtain a first, NON-CONFIRMATORY comparison. Confidence intervals below capture "
           "validation-data noise only, not seed-to-seed training variance. No claim in this report is confirmatory.\n")
+    if mode == "main":
+        seeds = res.get("seeds") or []
+        w(f"> **STATUS: MAIN, seed(s) {seeds}.** 100M training tokens per model. "
+          + ("With a single seed the seed-to-seed variance is unknown: differences below the pre-registered 0.02-nat "
+             "threshold are not interpretable, and no result is replicated.\n" if len(seeds) <= 1 else "\n"))
+    ms = res.get("multi_seed")
+    if ms:
+        w("## VERDICT (pre-registered rule, EXPERIMENT_SPEC Amendment 2)\n")
+        w(f"**Fusion (your parallel + periodic FusionMoE method): {ms.get('fusion_verdict')}**\n")
+        w(f"Rule: {ms['rule']}\n")
+        w("| comparison | dL per seed (nats) | mean dL | threshold | verdict |\n|---|---|---|---|---|")
+        labels = {"C_same_minus_B": "C_same - B (does adding fusion help?)",
+                  "C_matched_minus_B": "C_matched - B (fusion at the SAME budget)",
+                  "C_matched_minus_C_same": "C_matched - C_same", "B_minus_A": "B - A (parallel vs serial)",
+                  "C_same_minus_A": "C_same - A", "C_matched_minus_A": "C_matched - A"}
+        for k, v in ms["comparisons"].items():
+            w(f"| {labels.get(k, k)} | " + ", ".join(f"{d:+.4f}" for d in v["per_seed_d"].values())
+              + f" | {v['mean_d']:+.4f} | {v['threshold']:.3f} | {v['verdict']} |")
+        for k, v in (ms.get("wallclock") or {}).items():
+            w(f"\n* {k}: " + ", ".join(f"seed {s}: {'n/a' if d is None else f'{d:+.4f}'}" for s, d in v["per_seed"].items())
+              + f" -> {v['verdict']}")
+        w("\n| model | final val loss per seed | mean | train minutes (mean) |\n|---|---|---|---|")
+        for m, v in ms["final_loss"].items():
+            w(f"| {m} | " + ", ".join(f"{x:.4f}" for x in v["per_seed"].values()) + f" | {v['mean']:.4f} | {v['train_minutes_mean']:.1f} |")
+        w("")
     if res.get("failed_runs"):
         w("> **FAILED RUNS:** " + "; ".join(f"`{f['dir']}`: {(f['failure'] or {}).get('reason')}" for f in res["failed_runs"]) + "\n")
 
@@ -155,6 +180,9 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
         w(f"**Loss at common wall-clock** T* = {cw['t_star_seconds'] / 60:.2f} min ({cw['definition']}): " +
           ", ".join(f"{k} {_f(v)}" for k, v in cw["loss"].items()) + "\n")
     b = res.get("benchmark")
+    if not b and mode == "main":
+        w("**Systems benchmark / profiling:** not repeated in MAIN (token-independent); see the PILOT report "
+          "(`runs/pilot/FINAL_REPORT.md`): no meaningful attention/MoE kernel overlap, concurrent speed-up <= 1%.\n")
     if b:
         w(f"**Systems benchmark** (separate from training; one micro-batch of {b['micro_batch']} sequences, untrained weights, "
           f"{b['rounds']} interleaved rotated rounds):\n")
@@ -175,6 +203,9 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
         for k, r in R.items():
             rf = r["router_final"]
             alerts = [e["event"] for e in r["events"] if e["event"] != "checkpoint_saved"]
+            dead = [e for e in r["events"] if e["event"] == "dead_expert_alert"]
+            if dead:
+                alerts.append(f"dead-expert intervals from steps {[e['step'] for e in dead]}")
             w(f"| {k} | {_f(rf.get('util_cv_mean'), 3)} | {_f(rf.get('util_maxmin_ratio_max'), 2)} | {_f(rf.get('util_min_fraction'), 4)} | "
               f"{_f(rf.get('router_entropy'), 3)} | {', '.join(sorted(set(alerts))) or 'none'} |")
         w("")

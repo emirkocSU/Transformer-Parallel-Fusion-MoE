@@ -231,6 +231,7 @@ class Trainer:
         interval_entropy = torch.zeros(n_moe, dtype=torch.float32, device=dev)
         interval_n = 0
         imbalance_flag = False
+        dead_flag = False
 
         for step in range(start_step, tcfg.total_steps):
             self._sync()
@@ -318,9 +319,18 @@ class Trainer:
                         evlog.log({"step": step_done, "event": "expert_imbalance_alert" if severe else "expert_imbalance_cleared",
                                    "maxmin_ratio": us["util_maxmin_ratio_max"]})
                         imbalance_flag = severe
+                # ---- dead/starved-expert monitor (all steps, monitoring only) ----
+                frac = np.asarray(us["per_layer_fraction"])
+                dead_layers = [int(i) for i in np.nonzero((frac < tcfg.dead_expert_fraction).any(axis=1))[0]]
+                rec["dead_expert_layers"] = len(dead_layers)
+                if bool(dead_layers) != dead_flag:
+                    evlog.log({"step": step_done, "event": "dead_expert_alert" if dead_layers else "dead_expert_cleared",
+                               "layers": dead_layers, "layer_names": [model.moe_names()[i] for i in dead_layers],
+                               "min_fraction": float(frac.min())})
+                    dead_flag = bool(dead_layers)
                 self.log(f"[{self.run_name}] step {step_done}/{tcfg.total_steps} lm={lm_v:.4f} bal={bal_v:.4f} "
                          f"gn={gn_v:.3f} lr={lr:.2e} {rec['tokens_per_sec']:,.0f} tok/s "
-                         f"cv={us['util_cv_mean']:.3f} H={rec['router_entropy']:.3f}")
+                         f"cv={us['util_cv_mean']:.3f} H={rec['router_entropy']:.3f} dead_layers={len(dead_layers)}")
             tlog.log(rec)
 
             last = step_done == tcfg.total_steps

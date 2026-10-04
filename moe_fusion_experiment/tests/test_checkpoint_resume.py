@@ -132,3 +132,16 @@ def test_resume_on_cuda_bf16(tmp_path):
     a = [r["lm_loss"] for r in read_jsonl(tmp_path / "full" / "train_metrics.jsonl")]
     b = [r["lm_loss"] for r in read_jsonl(tmp_path / "part" / "train_metrics.jsonl")]
     assert len(a) == len(b) == 6 and np.allclose(a, b, atol=2e-2)
+
+
+def test_dead_expert_monitor_logs_events(tmp_path):
+    """A starved expert (below dead_expert_fraction of its layer's assignments) is recorded, never fatal."""
+    data = _data(tmp_path)
+    t = tiny_train_cfg(total_steps=6, log_every=2, dead_expert_fraction=0.99)  # threshold so high every expert is 'dead'
+    s = Trainer(tiny_model_cfg("A"), t, data, tmp_path / "r", "cpu", "r", save_final_weights=False,
+                log_fn=lambda *a: None).run(resume=False)
+    assert s["steps"] == 6
+    ev = read_jsonl(tmp_path / "r" / "events.jsonl")
+    assert any(e["event"] == "dead_expert_alert" for e in ev)
+    tr = read_jsonl(tmp_path / "r" / "train_metrics.jsonl")
+    assert all("dead_expert_layers" in r for r in tr if "per_layer_fraction" in r)

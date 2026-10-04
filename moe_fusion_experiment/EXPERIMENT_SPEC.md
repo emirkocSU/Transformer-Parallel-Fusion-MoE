@@ -103,6 +103,27 @@ LR 3e-3, 40 steps): mean -> 6 collapse warnings and one persistent collapse (C_s
 been run. The smoke router criterion was aligned with the training guard (a transient early warning is recorded;
 a persistent collapse or a collapsed layer in the final interval fails the smoke stage).
 
+## 6b. Amendment 2 -- MAIN protocol (fixed after the pilot, before any MAIN run)
+
+*Pilot findings that shaped it (seed 42, 25M tokens):* B beat A by 0.179 nats; C_same - B = +0.005 (inside the margin);
+C_matched - B = +0.059; no attention/MoE kernel overlap on the A100; A had a starved-expert episode (steps 16-44) that the
+collapse guard did not flag.
+
+* **Runs:** A_serial, B_parallel, C_parallel_fusion_samewidth, C_parallel_fusion_matched; 1526 steps x 65,536 tokens
+  = 100,007,936 tokens each (97,664 of 287,264 training rows: no row is seen twice); **seed 42 only** (owner's
+  decision; seed variance is therefore NOT measured). All other conditions of section 3 unchanged.
+* **Order:** B, C_same, C_matched, A (fusion-relevant runs first if the Colab session is lost); fresh process per run.
+* **Systems benchmark/profiling:** not repeated (token-independent; pilot values stand).
+* **Checkpoints:** local, every 400 steps, one file at a time; completed runs survive a lost session via Drive.
+* **Monitoring added (never stops a run):** dead/starved-expert alert when an expert receives < 0.0125 (= 0.1 x uniform)
+  of its layer's assignments in a logging interval.
+* **Decision rule** (`analysis.multi_seed_summary`): for X - Y with paired per-sequence dL and 95% CI,
+  threshold = max(0.02 nats, observed seed spread; with one seed: 0.02). *better/worse*: CI excludes 0 and |dL| >=
+  threshold; *approximately equal*: |dL| < 0.02; otherwise *inconclusive*.
+  **Fusion verdict:** USEFUL if C_matched beats B (same budget); ADDS QUALITY AT EXTRA COST if only C_same beats B
+  (then judged per wall-clock: C_same vs B at the common training time); NOT USEFUL if C_same is approximately equal
+  to or worse than B; otherwise INCONCLUSIVE. Single-seed results are reported as not replicated.
+
 ## 7. Phases
 
 0 environment, 1 data verification, 2 unit tests, 3 budget, 4 memory probe, 5 smoke, 6 systems benchmark,

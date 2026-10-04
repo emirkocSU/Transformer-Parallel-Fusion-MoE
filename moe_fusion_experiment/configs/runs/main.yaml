@@ -5,4 +5,4 @@ train:
   eval_seqs: 2048
   final_eval_seqs: null
   log_every: 16
-  ckpt_every: 200
+  ckpt_every: 400            # local resume checkpoints at steps 400, 800, 1200 (one file at a time)

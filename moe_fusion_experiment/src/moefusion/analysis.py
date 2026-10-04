@@ -143,3 +143,86 @@ def fairness_audit(runs: Dict[str, Dict], allowed=("name", "arch", "expert_hidde
     dh = {str(r["manifest"].get("dataset_hashes")) for r in rs}
     add("identical dataset hashes", len(dh) == 1)
     return {"passed": all(c["passed"] for c in checks), "checks": checks}
+
+
+# ----------------------------------------------------------------------------------------------------------
+# MAIN verdict rule (EXPERIMENT_SPEC Amendment 2, fixed before the MAIN runs). Works for 1..n seeds.
+#   d_s        paired mean difference X - Y on the full validation set in seed s (95% CI over sequences)
+#   threshold  max(EQUIV_MARGIN, observed seed spread of the final loss of X and Y); with ONE seed the spread is
+#              unknown, so the pre-registered practical margin (0.02 nats) is the noise floor
+#   better     every seed: d_s < 0 with CI upper bound < 0, AND |mean d| >= threshold
+#   worse      every seed: d_s > 0 with CI lower bound > 0, AND |mean d| >= threshold
+#   equal      |mean d| < EQUIV_MARGIN and every |d_s| < EQUIV_MARGIN
+#   otherwise  inconclusive
+# ----------------------------------------------------------------------------------------------------------
+MULTI_SEED_KEYS = ["C_same_minus_B", "C_matched_minus_B", "C_matched_minus_C_same", "B_minus_A", "C_same_minus_A",
+                   "C_matched_minus_A"]
+
+
+def multi_seed_verdict(ds, cis, threshold):
+    m = float(np.mean(ds))
+    if all(d < 0 and c[1] < 0 for d, c in zip(ds, cis)) and abs(m) >= threshold:
+        return "better (CI excludes 0 and abs(dL) >= %.3f nats)" % threshold
+    if all(d > 0 and c[0] > 0 for d, c in zip(ds, cis)) and abs(m) >= threshold:
+        return "worse (CI excludes 0 and abs(dL) >= %.3f nats)" % threshold
+    if abs(m) < EQUIV_MARGIN and all(abs(d) < EQUIV_MARGIN for d in ds):
+        return "approximately equal (within pre-registered margin in every seed)"
+    same_sign = all(d < 0 for d in ds) or all(d > 0 for d in ds)
+    return "inconclusive (" + ("consistent direction but abs(dL) below the %.3f-nat threshold" % threshold if same_sign
+                               else "direction differs between seeds") + ")"
+
+
+def multi_seed_summary(per_seed: Dict[int, Dict]) -> Dict:
+    seeds = sorted(per_seed)
+    models = [m for m in ("A", "B", "C_same", "C_matched") if all(m in per_seed[s].get("runs", {}) for s in seeds)]
+    final = {}
+    for m in models:
+        v = {s: per_seed[s]["runs"][m]["final_val_loss"] for s in seeds}
+        vals = list(v.values())
+        final[m] = {"per_seed": v, "mean": float(np.mean(vals)), "spread": float(max(vals) - min(vals)),
+                    "train_minutes_mean": float(np.mean([per_seed[s]["runs"][m]["train_seconds"] for s in seeds]) / 60)}
+    comps = {}
+    for key in MULTI_SEED_KEYS:
+        x, y = key.split("_minus_")
+        if x not in final or y not in final or not all(key in per_seed[s].get("paired", {}) for s in seeds):
+            continue
+        ds = [per_seed[s]["paired"][key]["mean"] for s in seeds]
+        cis = [per_seed[s]["paired"][key]["ci95_normal"] for s in seeds]
+        spread = max(final[x]["spread"], final[y]["spread"])
+        threshold = max(EQUIV_MARGIN, spread)
+        comps[key] = {"per_seed_d": dict(zip(seeds, ds)), "per_seed_ci": dict(zip(seeds, cis)), "mean_d": float(np.mean(ds)),
+                      "seed_spread": spread if len(seeds) > 1 else None, "threshold": threshold,
+                      "verdict": multi_seed_verdict(ds, cis, threshold)}
+    wall = {}
+    for x in ("C_same", "C_matched"):
+        if x in final and "B" in final:
+            per = {}
+            for s in seeds:
+                cw = per_seed[s].get("common_wallclock") or {}
+                lx, lb = (cw.get("loss") or {}).get(x), (cw.get("loss") or {}).get("B")
+                per[s] = None if lx is None or lb is None else lx - lb
+            vals = [v for v in per.values() if v is not None]
+            wall[f"{x}_minus_B_at_common_wallclock"] = {
+                "per_seed": per,
+                "verdict": ("better per wall-clock in every seed" if vals and len(vals) == len(seeds) and all(v < 0 for v in vals)
+                            else "worse per wall-clock in every seed" if vals and len(vals) == len(seeds) and all(v > 0 for v in vals)
+                            else "mixed / not available")}
+    fusion = None
+    if "C_matched_minus_B" in comps and "C_same_minus_B" in comps:
+        vm, vs = comps["C_matched_minus_B"]["verdict"], comps["C_same_minus_B"]["verdict"]
+        if vm.startswith("better"):
+            fusion = "USEFUL: with the SAME parameter/compute budget, parallel+fusion beats the pure parallel model."
+        elif vs.startswith("better"):
+            fusion = ("ADDS QUALITY AT EXTRA COST: fusion improves quality only when it adds parameters/compute; "
+                      "see the wall-clock comparison for whether it pays for its cost.")
+        elif vs.startswith("approximately") or vs.startswith("worse"):
+            fusion = "NOT USEFUL in this setting: adding fusion layers does not improve on the pure parallel model."
+        else:
+            fusion = "INCONCLUSIVE: the fusion effect is below the pre-registered decision threshold."
+        if len(seeds) == 1:
+            fusion += " (single seed: not replicated)"
+    return {"seeds": seeds, "models": models, "final_loss": final, "comparisons": comps, "wallclock": wall,
+            "fusion_verdict": fusion,
+            "rule": "d_s = paired dL per seed; better/worse require the same sign with a CI excluding 0 in EVERY seed AND "
+                    "|mean d| >= max(%.2f nats, observed seed spread); equal requires |d| < %.2f nats in every seed."
+                    % (EQUIV_MARGIN, EQUIV_MARGIN)}

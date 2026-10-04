@@ -138,6 +138,9 @@ class TrainConfig:
     collapse_min_fraction: float = 0.01
     collapse_patience: int = 3
     imbalance_alert_ratio: float = 10.0
+    # monitoring only (never stops a run): an expert receiving less than this fraction of ITS LAYER's assignments is
+    # "starved/dead" for the interval (pilot: A_serial had such an expert at steps 16-44, below the collapse guard)
+    dead_expert_fraction: float = 0.0125  # = 0.1 x uniform share (1/8)
 
     def validate(self) -> "TrainConfig":
         if self.micro_batch_seqs is not None:

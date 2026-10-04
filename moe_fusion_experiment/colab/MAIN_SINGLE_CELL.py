@@ -1,10 +1,14 @@
 # ==================================================================================================
-#  A/B/C MoE FUSION DENEYİ — VERİDEN PİLOT SONUNA KADAR TEK HÜCRE  (Google Colab, A100)
+#  A/B/C MoE FUSION DENEYİ — MAIN (100M token, seed 42) TEK HÜCRE  (Google Colab, A100)
 #  Çalışma zamanı: Runtime > Change runtime type > A100 GPU.  Hücreyi bir kez çalıştırın.
-#  Kod zip'i (moe_fusion_experiment.zip) bulunamazsa Colab yükleme penceresi açılır.
-#  Bağlantı koparsa hücreyi tekrar çalıştırın: tamamlanan aşamalar/koşular atlanır.
+#  Kod zip'i (moe_fusion_experiment.zip, sürüm aşağıda) bulunamazsa Colab yükleme penceresi açılır.
+#  Veri /content'te yoksa Drive yedeğinden (MyDrive/moe_fusion_experiment/moe_data) otomatik geri yüklenir.
+#  Bağlantı koparsa hücreyi tekrar çalıştırın: tamamlanan aşamalar ve TAMAMLANAN koşular atlanır;
+#  yarıda kalan koşu (yeni oturumda) baştan başlar. Tarayıcı sekmesini açık tutun.
 # ==================================================================================================
-RUN_MODE = "pilot"                 # "smoke" (yalnız doğrulama) | "pilot" (A/B/C ~25M token). MAIN bu hücreden başlatılmaz.
+RUN_MODE = "main"                  # "smoke" | "pilot" | "main"
+MODELS = "B_parallel,C_parallel_fusion_samewidth,C_parallel_fusion_matched,A_serial"  # koşu sırası (fusion önce)
+SEED = 42
 DATA_DIR = "/content/moe_data"     # mevcut veri klasörünüz (train.npy, validation.npy, tokenizer.json, ...)
 PROJECT_DIR = "/content/moe_fusion_experiment"
 OUT_DIR = "/content/moe_fusion_runs"
@@ -21,8 +25,11 @@ EXPECTED_VERSION = "1.3.0"
 
 import glob, os, re, shutil, subprocess, sys, time, zipfile
 
-assert RUN_MODE in ("smoke", "pilot"), "Bu hücre yalnızca smoke/pilot çalıştırır (yanlışlıkla büyük maliyet önlemi)."
-print(f"RUN_MODE = {RUN_MODE}")
+assert RUN_MODE in ("smoke", "pilot", "main"), RUN_MODE
+print(f"RUN_MODE = {RUN_MODE}   MODELS = {MODELS}   SEED = {SEED}")
+if RUN_MODE == "main":
+    print("Plan: 4 model x 1526 adım x 65.536 token = 100.007.936 token/model. Pilot hızlarına göre tahmini toplam süre "
+          "~3-3,3 saat (B ve A ~40 dk, C_same ~47 dk, C_matched ~44 dk + kurulum/test/smoke ~15 dk).")
 
 # ---- 1) GPU hızlı kontrol --------------------------------------------------------------------------
 smi = subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"], capture_output=True, text=True)
@@ -128,9 +135,11 @@ if need:
     print("Kuruluyor:", need)
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", *need], check=True)
 
-# ---- 5) Pipeline: ortam -> veri doğrulama -> testler -> bütçe -> bellek probu -> smoke -> benchmark ->
-#         profil -> A, B, C_same, C_matched pilot eğitimleri -> analiz/grafik/rapor -> zip ------------
-cmd = [sys.executable, "scripts/run_pipeline.py", "--mode", RUN_MODE, "--data-dir", DATA_DIR, "--out", OUT_DIR]
+# ---- 5) Pipeline: ortam -> veri (Drive'dan geri yükleme + sha256 doğrulama) -> testler -> bütçe -> bellek probu ->
+#         smoke -> eğitimler (MODELS sırasıyla) -> karar/analiz/grafik/rapor -> zip --------------------------
+#         (MAIN'de benchmark/profil yapılmaz: pilotta ölçüldü, token sayısından bağımsız) -----------------
+cmd = [sys.executable, "scripts/run_pipeline.py", "--mode", RUN_MODE, "--data-dir", DATA_DIR, "--out", OUT_DIR,
+       "--models", MODELS, "--seed", str(SEED)]
 if USE_DRIVE:
     cmd += ["--drive-dir", DRIVE_DIR]
     if BACKUP_DATA_TO_DRIVE:
