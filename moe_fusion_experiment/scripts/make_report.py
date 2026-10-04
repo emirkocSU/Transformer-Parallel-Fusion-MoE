@@ -160,6 +160,9 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
           f"{b['rounds']} interleaved rotated rounds):\n")
         w("| variant | forward ms | fwd+bwd ms | optimizer step ms | tokens/s (step) | peak GB |\n|---|---|---|---|---|---|")
         for k, v in b["full_model"].items():
+            if "error" in v:
+                w(f"| {k} | FAILED: {v['error']} | | | | |")
+                continue
             w(f"| {k} | {v['forward']['median_of_round_medians_ms']:.1f} | {v['forward_backward']['median_of_round_medians_ms']:.1f} | "
               f"{v['optimizer_step']['median_of_round_medians_ms']:.1f} | {v['optimizer_step']['tokens_per_sec']:,.0f} | {v['peak_mem_alloc_gb']:.1f} |")
         w("")
@@ -228,11 +231,14 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
     w(f"\n**Q3 - does C help when compute is matched:** " + (f"MEASURED dL(C_matched-A) = {_ci(q3)}, dL(C_matched-B) = "
       f"{_ci(pst('C_matched_minus_B')) if pst('C_matched_minus_B') else 'n/a'}. INTERPRETATION vs A: {q3['classification']}." if q3 else "n/a"))
     sB = _speed(R, "A", "B")
+    fm = (b or {}).get("full_model", {})
+    bc, br_ = fm.get("B_parallel[concurrent]", {}), fm.get("B_parallel[reference]", {})
+    conc_ratio = (bc["optimizer_step"]["median_of_round_medians_ms"] / br_["optimizer_step"]["median_of_round_medians_ms"]
+                  if "optimizer_step" in bc and "optimizer_step" in br_ else None)
     w(f"\n**Q4 - A100 wall-clock speed-up of the parallel structure:** MEASURED training step time B vs A: "
       f"{_f(None if sB is None else 100 * sB, 2, True)}% (both use the same sequential dispatch)." +
-      (f" Benchmark: B[concurrent] vs B[reference] optimizer step ratio "
-       f"{b['full_model']['B_parallel[concurrent]']['optimizer_step']['median_of_round_medians_ms'] / b['full_model']['B_parallel[reference]']['optimizer_step']['median_of_round_medians_ms']:.3f}."
-       if b else "") +
+      (f" Benchmark: B[concurrent] / B[reference] optimizer-step time ratio {conc_ratio:.3f}." if conc_ratio else
+       " Benchmark concurrency ratio: not available.") +
       f" INTERPRETATION: differences below {100 * SPEED_MARGIN:.0f}% are treated as no speed difference. A mathematically parallel "
       "block yields hardware speed-up only through kernel concurrency or fused projections (see Q5/Q6); with sequential "
       "dispatch it performs the same work as A.")

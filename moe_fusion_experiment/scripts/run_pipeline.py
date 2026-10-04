@@ -295,14 +295,19 @@ def main():
         if args.mode != "smoke":
             # PHASE 6 - systems benchmark
             if not args.skip_benchmark and not (root / "benchmark" / "benchmark.json").exists():
-                sh([PY, "scripts/benchmark_models.py", "--run", args.mode, "--micro-batch", mb, "--data-dir", data_dir,
-                    "--out", root, "--attention-backend", attn])
-                mark("benchmark")
+                # systems measurement: a failure is recorded and reported, it never blocks the training comparison
+                rc, _ = sh([PY, "scripts/benchmark_models.py", "--run", args.mode, "--micro-batch", mb, "--data-dir",
+                            data_dir, "--out", root, "--attention-backend", attn], allow=tuple(range(256)))
+                if rc != 0:
+                    print(f"  WARNING: benchmark exited with code {rc}; continuing with training (see report)")
+                mark("benchmark", {"exit_code": rc})
             # PHASE 7 - profiling
             if not args.skip_profile and not (root / "profiles" / "overlap_analysis.json").exists():
-                sh([PY, "scripts/profile_model.py", "--run", args.mode, "--micro-batch", mb, "--out", root,
-                    "--attention-backend", attn])
-                mark("profile")
+                rc, _ = sh([PY, "scripts/profile_model.py", "--run", args.mode, "--micro-batch", mb, "--out", root,
+                            "--attention-backend", attn], allow=tuple(range(256)))
+                if rc != 0:
+                    print(f"  WARNING: profiling exited with code {rc}; continuing with training (see report)")
+                mark("profile", {"exit_code": rc})
 
             # PHASE 8 - training runs (fixed, documented order)
             for name in models:

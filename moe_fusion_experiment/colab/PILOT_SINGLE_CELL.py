@@ -17,7 +17,7 @@ FINAL_WEIGHTS_TO_DRIVE = True      # model_final_bf16.pt (~1 GB/koşu) yerel dis
 ALLOW_DATA_REBUILD = True          # veri yerelde ve Drive'da yoksa: sabit FineWeb-Edu sürümünden yeniden üret
                                    # (orijinal manifestin sha256'larıyla bit düzeyinde karşılaştırılır)
 FORCE_REUPLOAD = False             # True: mevcut kodu silip zip'i yeniden yükle
-EXPECTED_VERSION = "1.2.1"
+EXPECTED_VERSION = "1.2.2"
 
 import glob, os, re, shutil, subprocess, sys, time, zipfile
 
@@ -43,41 +43,72 @@ if USE_DRIVE:
         USE_DRIVE = False
 
 # ---- 3) Proje kodu (zip) -------------------------------------------------------------------------
+_VER_RE = re.compile(r'__version__\s*=\s*"([^"]+)"')
+
 def _version(d):
     p = os.path.join(d, "src", "moefusion", "__init__.py")
     if not os.path.exists(p):
         return None
-    m = re.search(r'__version__\s*=\s*"([^"]+)"', open(p).read())
+    m = _VER_RE.search(open(p, encoding="utf-8").read())
     return m.group(1) if m else None
+
+def _zip_version(z):
+    """Sürümü zip'i AÇMADAN okur; bozuk/ilgisiz zip -> None."""
+    try:
+        with zipfile.ZipFile(z) as zf:
+            for n in zf.namelist():
+                if n.replace("\\", "/").endswith("src/moefusion/__init__.py"):
+                    m = _VER_RE.search(zf.read(n).decode("utf-8"))
+                    return m.group(1) if m else None
+    except Exception:
+        return None
+    return None
+
+def _extract(z):
+    tmp = "/content/_moe_extract_tmp"
+    shutil.rmtree(tmp, ignore_errors=True)
+    with zipfile.ZipFile(z) as zf:
+        zf.extractall(tmp)
+    roots = [r for r, _, fs in os.walk(tmp) if r.endswith(os.path.join("src", "moefusion")) and "__init__.py" in fs]
+    if len(roots) != 1:
+        raise SystemExit(f"Zip yapısı tanınmadı ({z}): src/moefusion bulunamadı")
+    proj = os.path.dirname(os.path.dirname(roots[0]))
+    shutil.rmtree(PROJECT_DIR, ignore_errors=True)
+    shutil.move(proj, PROJECT_DIR)
+    shutil.rmtree(tmp, ignore_errors=True)
 
 if FORCE_REUPLOAD and os.path.isdir(PROJECT_DIR):
     shutil.rmtree(PROJECT_DIR)
 if _version(PROJECT_DIR) != EXPECTED_VERSION:
-    cands = sorted(glob.glob("/content/moe_fusion_experiment*.zip"), key=os.path.getmtime, reverse=True)
+    cands = glob.glob("/content/*.zip")
     if USE_DRIVE:
-        cands += glob.glob(os.path.join(DRIVE_DIR, "moe_fusion_experiment*.zip"))
-    zpath = cands[0] if cands else None
-    if zpath is None:
+        cands += glob.glob(os.path.join(DRIVE_DIR, "*.zip"))
+    good = []
+    for z in sorted(set(cands), key=os.path.getmtime, reverse=True):
+        v = _zip_version(z)
+        if v == EXPECTED_VERSION:
+            good.append(z)
+        elif v is not None:
+            print(f"  atlandı (eski sürüm {v}): {z}")
+    if good:
+        zpath = good[0]
+    else:
         from google.colab import files
-        print("Lütfen moe_fusion_experiment.zip dosyasını seçin ...")
+        print(f"Lütfen moe_fusion_experiment.zip (sürüm {EXPECTED_VERSION}) dosyasını seçin ...")
         up = files.upload()
-        zips = [k for k in up if k.endswith(".zip")]
+        zips = [os.path.abspath(k) for k in up if k.endswith(".zip")]
         if not zips:
             raise SystemExit("Zip yüklenmedi.")
-        zpath = os.path.join("/content", zips[0])
-    print("Kod zip'i:", zpath)
-    if os.path.isdir(PROJECT_DIR):
-        shutil.rmtree(PROJECT_DIR)
-    with zipfile.ZipFile(zpath) as zf:
-        names = zf.namelist()
-        if all(n.startswith("moe_fusion_experiment/") for n in names):
-            zf.extractall("/content")
-        else:
-            zf.extractall(PROJECT_DIR)
+        zpath = zips[0]
+        if _zip_version(zpath) != EXPECTED_VERSION:
+            raise SystemExit(f"Yüklenen zip sürümü {_zip_version(zpath)}, beklenen {EXPECTED_VERSION}. "
+                             "En son gönderilen zip'i yükleyin.")
+    print("Kod zip'i:", zpath, "sürüm", _zip_version(zpath))
+    _extract(zpath)
     if _version(PROJECT_DIR) != EXPECTED_VERSION:
-        raise SystemExit(f"Zip içeriği beklenen sürüm değil: {_version(PROJECT_DIR)} != {EXPECTED_VERSION}")
+        raise SystemExit(f"Çıkarılan kod sürümü {_version(PROJECT_DIR)} != {EXPECTED_VERSION}")
     if USE_DRIVE and not zpath.startswith(DRIVE_DIR):
-        shutil.copy2(zpath, os.path.join(DRIVE_DIR, "moe_fusion_experiment.zip"))
+        shutil.copy2(zpath, os.path.join(DRIVE_DIR, "moe_fusion_experiment.zip"))  # eski kopyanın üzerine yazar
 print("Proje:", PROJECT_DIR, "sürüm", _version(PROJECT_DIR))
 
 # ---- 4) Eksik bağımlılıklar (torch'a DOKUNULMAZ) --------------------------------------------------

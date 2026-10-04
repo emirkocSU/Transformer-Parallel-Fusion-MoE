@@ -191,7 +191,7 @@ def make_all_plots(root: Path, res: dict):
     # systems benchmark
     b = res.get("benchmark")
     if b and b.get("full_model"):
-        vals = {k: v["optimizer_step"]["median_of_round_medians_ms"] for k, v in b["full_model"].items()}
+        vals = {k: v["optimizer_step"]["median_of_round_medians_ms"] for k, v in b["full_model"].items() if "error" not in v}
         vals = {k.replace("C_samewidth", "C_same").replace("A_serial", "A").replace("B_parallel", "B"): v for k, v in vals.items()}
         plots["benchmark_step_time"] = _bars(vals, "ms per micro-batch step", "Systems benchmark: full optimizer step "
                                              f"(micro-batch {b['micro_batch']})", pdir / "benchmark_step_time.png",
