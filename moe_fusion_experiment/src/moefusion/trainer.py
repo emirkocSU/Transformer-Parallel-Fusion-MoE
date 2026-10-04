@@ -14,6 +14,7 @@ from __future__ import annotations
 import contextlib
 import math
 import os
+import shutil
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -114,12 +115,17 @@ def _step_stats(times) -> Dict[str, float]:
 class Trainer:
     def __init__(self, mcfg: ModelConfig, tcfg: TrainConfig, data: TokenDataset, out_dir, device,
                  run_name: str, manifest_extra: Optional[Dict[str, Any]] = None, save_final_weights: bool = True,
-                 keep_resume_checkpoint: bool = False, log_fn=print, stop_after_step: Optional[int] = None):
+                 keep_resume_checkpoint: bool = False, log_fn=print, stop_after_step: Optional[int] = None,
+                 ckpt_dir=None, final_weights_dir=None, keep_final_state: bool = False):
         if tcfg.micro_batch_seqs is None:
             raise ValueError("micro_batch_seqs must be set (use the common memory probe)")
         self.mcfg, self.tcfg, self.data = mcfg, tcfg, data
         self.out = Path(out_dir)
         self.out.mkdir(parents=True, exist_ok=True)
+        # The resume checkpoint may live elsewhere (e.g. Google Drive) than the run's logs; a snapshot of the
+        # logs is stored next to it so that a resume in a NEW session restores logs consistent with the checkpoint.
+        self.ckpt_dir = Path(ckpt_dir) if ckpt_dir else self.out
+        self.final_weights_dir = Path(final_weights_dir) if final_weights_dir else self.out
         self.device = torch.device(device)
         self.run_name = run_name
         self.manifest_extra = manifest_extra or {}
@@ -128,6 +134,7 @@ class Trainer:
         self.log = log_fn
         self.stop_after_step = stop_after_step  # testing hook: simulate an interruption after a checkpoint
         self.final_state_dict = None
+        self.keep_final_state = keep_final_state  # tests only (a CPU copy of a 0.5B model costs ~2 GB RAM)
         self.cfg_dict = config_dict(mcfg, tcfg)
         self.cfg_hash = config_hash(self.cfg_dict)
 
@@ -154,7 +161,8 @@ class Trainer:
         mb, accum = tcfg.micro_batch_seqs, tcfg.grad_accum
         targets_per_step = tcfg.global_batch_seqs * self.data.targets_per_row
 
-        ckpt_path = self.out / "checkpoint.pt"
+        ckpt_path = self.ckpt_dir / "checkpoint.pt"
+        snap_dir = self.ckpt_dir / "log_snapshot"
         train_log_path = self.out / "train_metrics.jsonl"
         eval_log_path = self.out / "eval_metrics.jsonl"
         events_path = self.out / "events.jsonl"
@@ -166,6 +174,10 @@ class Trainer:
             payload = load_checkpoint(ckpt_path, model, opt, map_location=dev, strict_config=self.cfg_dict)
             start_step = payload["step"]
             state.update(payload["state"])
+            if snap_dir.exists() and snap_dir.resolve() != self.out.resolve():
+                for p in (train_log_path, eval_log_path, events_path):
+                    if (snap_dir / p.name).exists():
+                        shutil.copy2(snap_dir / p.name, p)
             for p in (train_log_path, eval_log_path, events_path):
                 _truncate_jsonl(p, start_step)
             self.log(f"[{self.run_name}] resumed from step {start_step}")
@@ -173,6 +185,8 @@ class Trainer:
             for p in (train_log_path, eval_log_path, events_path, self.out / "failure.json"):
                 if p.exists():
                     p.unlink()
+            if snap_dir.exists():
+                shutil.rmtree(snap_dir)
         state["segments"].append({"start_step": start_step, "start_time": start_iso,
                                   "gpu": torch.cuda.get_device_name(0) if dev.type == "cuda" else "cpu"})
 
@@ -305,8 +319,18 @@ class Trainer:
                 do_eval(step_done)
             if tcfg.ckpt_every and step_done % tcfg.ckpt_every == 0 and not last:
                 tc = time.perf_counter()
-                save_checkpoint(ckpt_path, model, opt, step_done, state, self.cfg_dict)
+                ci = save_checkpoint(ckpt_path, model, opt, step_done, state, self.cfg_dict)
+                if ci["saved"] and snap_dir.resolve() != self.out.resolve():
+                    snap_dir.mkdir(parents=True, exist_ok=True)
+                    for p in (train_log_path, eval_log_path, events_path):
+                        if p.exists():
+                            shutil.copy2(p, snap_dir / p.name)
                 state["ckpt_seconds"] += time.perf_counter() - tc
+                evlog.log({"step": step_done, "event": "checkpoint_saved" if ci["saved"] else "checkpoint_SKIPPED",
+                           "path": str(ckpt_path), "seconds": time.perf_counter() - tc,
+                           **{k: v for k, v in ci.items() if k != "saved"}})
+                self.log(f"[{self.run_name}] checkpoint {'saved' if ci['saved'] else 'SKIPPED'} at step {step_done} "
+                         f"({ci['bytes_estimate'] / 1e9:.2f} GB -> {ckpt_path.parent}) {ci.get('reason', '')}")
                 if self.stop_after_step is not None and step_done >= self.stop_after_step:
                     tlog.close(), elog.close(), evlog.close()
                     return {"status": "interrupted", "step": step_done}
@@ -316,12 +340,18 @@ class Trainer:
         final = do_eval(tcfg.total_steps, final=True)
         tlog.close(), elog.close(), evlog.close()
 
-        self.final_state_dict = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+        if self.keep_final_state:
+            self.final_state_dict = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
         if self.save_final_weights:
             sd = {k: v.detach().to(torch.bfloat16).cpu() for k, v in model.state_dict().items()}
-            torch.save({"model": sd, "config": self.cfg_dict}, self.out / "model_final_bf16.pt")
-        if ckpt_path.exists() and not self.keep_resume_checkpoint:
-            ckpt_path.unlink()
+            self.final_weights_dir.mkdir(parents=True, exist_ok=True)
+            torch.save({"model": sd, "config": self.cfg_dict}, self.final_weights_dir / "model_final_bf16.pt")
+            del sd
+        if not self.keep_resume_checkpoint:
+            if ckpt_path.exists():
+                ckpt_path.unlink()
+            if snap_dir.exists() and snap_dir.resolve() != self.out.resolve():
+                shutil.rmtree(snap_dir)
 
         st = state["step_times"]
         summary = {
@@ -368,7 +398,8 @@ class Trainer:
             "scheduler": {"type": "linear_warmup_cosine", "warmup_steps": tcfg.warmup_steps, "lr": tcfg.lr,
                           "min_lr": tcfg.lr * tcfg.min_lr_ratio},
             "tokens": state["tokens"], "start_time": summary["start_time"], "end_time": summary["end_time"],
-            "checkpoint_paths": {"final_weights": str(self.out / "model_final_bf16.pt") if self.save_final_weights else None},
+            "checkpoint_paths": {"final_weights": str(self.final_weights_dir / "model_final_bf16.pt") if self.save_final_weights else None,
+                                 "resume_checkpoint_dir": str(self.ckpt_dir)},
             **self.manifest_extra,
         }
         write_json(self.out / "experiment_manifest.json", manifest)

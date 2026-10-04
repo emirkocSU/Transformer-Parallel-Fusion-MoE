@@ -33,6 +33,8 @@ def main():
     ap.add_argument("--no-final-weights", action="store_true")
     ap.add_argument("--dataset-report", default=None, help="dataset_verification.json to embed hashes in the manifest")
     ap.add_argument("--run-name", default=None)
+    ap.add_argument("--ckpt-dir", default=None, help="parent dir for the resume checkpoint (default: the run dir)")
+    ap.add_argument("--final-weights-dir", default=None, help="parent dir for model_final_bf16.pt (default: the run dir)")
     args = ap.parse_args()
 
     numerics = configure_torch_numerics()
@@ -58,7 +60,9 @@ def main():
         extra["dataset_hashes"] = {s: dr.get("arrays", {}).get(s, {}).get("sha256_file") for s in ("train", "validation")}
         extra["tokenizer_sha256"] = dr.get("tokenizer", {}).get("sha256")
     tr = Trainer(mcfg, tcfg, data, out, dev, run_name, manifest_extra=extra,
-                 save_final_weights=not args.no_final_weights)
+                 save_final_weights=not args.no_final_weights,
+                 ckpt_dir=Path(args.ckpt_dir) / run_name if args.ckpt_dir else None,
+                 final_weights_dir=Path(args.final_weights_dir) / run_name if args.final_weights_dir else None)
     try:
         s = tr.run(resume=not args.no_resume)
     except TrainingFailure as e:

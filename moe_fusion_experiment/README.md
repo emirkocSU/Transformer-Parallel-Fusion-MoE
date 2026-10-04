@@ -17,10 +17,18 @@ A controlled architecture experiment for one question:
    `colab/A100_MoE_Fusion_Experiment.ipynb`) and run it.
 3. When asked, upload `moe_fusion_experiment.zip`. Everything up to the end of the pilot runs automatically.
 
+**Disk / checkpoints.** One resume checkpoint per run exists at a time (fp32 weights + AdamW moments: 5.73 GB for
+A/B/C_matched, 7.01 GB for C_same) and is deleted when the run finishes. `CHECKPOINT_LOCATION = "local"` (default)
+needs ~14 GB transient local space for an atomic overwrite; if free space is short the old file is deleted first,
+and if even that does not fit the save is skipped and logged (training never crashes on disk space).
+`CHECKPOINT_LOCATION = "drive"` writes it to `MyDrive/moe_fusion_experiment/checkpoints/` (with a log snapshot), so a
+disconnected run resumes in a NEW session from its last checkpoint. `FINAL_WEIGHTS_TO_DRIVE = True` (default) puts the
+~1 GB bf16 final weights of each run on Drive. Deleted Drive files sit in the Drive trash (quota) for 30 days.
+
 `RUN_MODE = "smoke"` runs only the validation stages (~10 min). `RUN_MODE = "pilot"` (default) adds the systems
 benchmark, profiling and four pilot trainings of 25.2M tokens each. Re-running the cell after a disconnect resumes:
-finished phases and runs are skipped (results are mirrored to Drive; interrupted runs resume from their local
-checkpoint in the same session, or restart from step 0 in a new session).
+finished phases and runs are skipped (results are mirrored to Drive; an interrupted run resumes from its last
+checkpoint — in a new session only if `CHECKPOINT_LOCATION = "drive"`).
 
 ## What the pipeline does (`scripts/run_pipeline.py`)
 

@@ -11,9 +11,12 @@ OUT_DIR = "/content/moe_fusion_runs"
 USE_DRIVE = True                   # sonuçları (checkpoint hariç) Google Drive'a yedekler
 DRIVE_DIR = "/content/drive/MyDrive/moe_fusion_experiment"
 BACKUP_DATA_TO_DRIVE = True        # veri setini bir kez Drive'a kopyalar (sonraki oturumlar için)
+CHECKPOINT_LOCATION = "local"      # "local": devam checkpoint'i yerel diskte (koşu başına TEK dosya, 5.7-7.0 GB, koşu bitince silinir)
+                                   # "drive": Drive'a yazılır -> bağlantı kopsa bile yeni oturumda kaldığı adımdan devam eder
+FINAL_WEIGHTS_TO_DRIVE = True      # model_final_bf16.pt (~1 GB/koşu) yerel disk yerine Drive'a
 ALLOW_DATA_REBUILD = False         # veri hiçbir yerde yoksa FineWeb-Edu'dan yeniden üretmeye izin ver
 FORCE_REUPLOAD = False             # True: mevcut kodu silip zip'i yeniden yükle
-EXPECTED_VERSION = "1.0.0"
+EXPECTED_VERSION = "1.1.0"
 
 import glob, os, re, shutil, subprocess, sys, time, zipfile
 
@@ -99,6 +102,11 @@ if USE_DRIVE:
     cmd += ["--drive-dir", DRIVE_DIR]
     if BACKUP_DATA_TO_DRIVE:
         cmd += ["--backup-data-to-drive"]
+    if FINAL_WEIGHTS_TO_DRIVE:
+        cmd += ["--final-weights-to-drive"]
+    cmd += ["--ckpt-location", CHECKPOINT_LOCATION]
+elif CHECKPOINT_LOCATION == "drive":
+    print("UYARI: Drive bağlı değil; checkpoint yerel diske yazılacak.")
 if ALLOW_DATA_REBUILD:
     cmd += ["--allow-data-rebuild"]
 t0 = time.time()

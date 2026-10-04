@@ -1,8 +1,14 @@
-"""Resumable checkpoints: model, optimizer, step, tokens, wall-clock counters, all RNG states."""
+"""Resumable checkpoints: model, optimizer, step, tokens, wall-clock counters, all RNG states.
+
+Disk safety: a checkpoint is written to `<path>.tmp` and atomically renamed, which transiently needs space for the
+old AND the new file. If free space is insufficient for both, the old checkpoint is deleted first (logged); if it is
+still insufficient the save is skipped (logged) instead of crashing the run with "No space left on device".
+"""
 from __future__ import annotations
 
 import os
 import random
+import shutil
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -29,10 +35,41 @@ def set_rng_state(st: Dict[str, Any]) -> None:
         torch.cuda.set_rng_state_all(st["torch_cuda"])
 
 
-def save_checkpoint(path, model, optimizer, step: int, state: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Atomic save (tmp file + rename). `state` holds counters such as tokens/train_seconds."""
+def estimate_checkpoint_bytes(model, optimizer) -> int:
+    """fp32 weights + optimizer state (AdamW: 2 fp32 moments; estimated as 2x params before the first step)."""
+    n = sum(t.numel() * t.element_size() for t in model.state_dict().values())
+    opt = 0
+    for st in optimizer.state.values():
+        for v in st.values():
+            if torch.is_tensor(v):
+                opt += v.numel() * v.element_size()
+    if opt == 0:
+        opt = 2 * sum(p.numel() * 4 for p in model.parameters())
+    return int(n + opt)
+
+
+def free_bytes(path) -> int:
+    p = Path(path)
+    while not p.exists():
+        p = p.parent
+    return shutil.disk_usage(p).free
+
+
+def save_checkpoint(path, model, optimizer, step: int, state: Dict[str, Any], config: Dict[str, Any],
+                    margin_gb: float = 2.0) -> Dict[str, Any]:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    need = estimate_checkpoint_bytes(model, optimizer)
+    margin = int(margin_gb * 1e9)
+    info: Dict[str, Any] = {"saved": False, "bytes_estimate": need, "deleted_old_first": False}
+    if free_bytes(path.parent) < need + margin and path.exists():
+        path.unlink()  # cannot hold old + new: give up atomicity rather than fail
+        info["deleted_old_first"] = True
+    free = free_bytes(path.parent)
+    info["free_bytes_before"] = free
+    if free < need + margin:
+        info["reason"] = f"insufficient disk: {free / 1e9:.1f} GB free, {need / 1e9:.1f} GB + {margin_gb} GB margin needed"
+        return info
     payload = {
         "format_version": 1,
         "step": int(step),
@@ -43,8 +80,16 @@ def save_checkpoint(path, model, optimizer, step: int, state: Dict[str, Any], co
         "config": config,
     }
     tmp = path.with_suffix(path.suffix + ".tmp")
-    torch.save(payload, tmp)
-    os.replace(tmp, path)
+    try:
+        torch.save(payload, tmp)
+        os.replace(tmp, path)
+    except OSError as e:
+        if tmp.exists():
+            tmp.unlink()
+        info["reason"] = f"write failed: {e}"
+        return info
+    info["saved"] = True
+    return info
 
 
 def load_checkpoint(path, model, optimizer, map_location="cpu", strict_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

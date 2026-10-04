@@ -114,6 +114,38 @@ def ensure_data(data_dir: Path, drive_dir: Path, allow_rebuild: bool, backup: bo
                 print(f"  [drive] WARNING: dataset backup failed: {e}")
 
 
+# ----------------------------------------------------------------------------------------------- disk
+def disk_plan(root: Path, models, mode: str, ckpt_parent, weights_parent):
+    """Print where the large files go and the expected PEAK local disk use; warn early if it will not fit."""
+    banner("DISK PLAN")
+    sys.path.insert(0, str(ROOT / "src"))
+    from moefusion.config import load_experiment
+    from moefusion.flop_counter import analytic_budget
+
+    params = {m: analytic_budget(load_experiment(m, mode)[0])["params_total"] for m in models}
+    ckpt = {m: p * 12 / 1e9 for m, p in params.items()}      # fp32 weights + 2 AdamW moments
+    weights = {m: p * 2 / 1e9 for m, p in params.items()}    # bf16 final weights
+    free = shutil.disk_usage(root).free / 1e9
+    big = max(ckpt.values())
+    smoke_peak = 2 * big                                     # smoke checkpoints are always local (deleted after)
+    run_ckpt_local = 0.0 if ckpt_parent else 2 * big         # old + new during an atomic overwrite
+    weights_local = 0.0 if weights_parent else sum(weights.values())
+    peak = max(smoke_peak, run_ckpt_local + weights_local) + 1.0
+    for m in models:
+        print(f"  {m:32s} resume checkpoint {ckpt[m]:5.2f} GB   final bf16 weights {weights[m]:4.2f} GB")
+    print(f"  resume checkpoints -> {ckpt_parent or 'local run dirs'} (ONE per run at a time, deleted when the run ends)")
+    print(f"  final weights      -> {weights_parent or 'local run dirs'}")
+    print(f"  free local disk now: {free:.1f} GB   expected peak additional local use: ~{peak:.1f} GB")
+    print("  if free space is short at save time, the old checkpoint is deleted before writing (1x instead of 2x),")
+    print("  and if even 1x does not fit, the checkpoint is SKIPPED and logged - training never crashes on disk space.")
+    if free < peak:
+        print(f"  WARNING: free disk ({free:.1f} GB) is below the comfortable peak ({peak:.1f} GB); the low-disk policy "
+              "above will be used. Consider CHECKPOINT_LOCATION='drive' / FINAL_WEIGHTS_TO_DRIVE=True.")
+    if ckpt_parent:
+        print("  NOTE: files deleted from Drive go to the Drive trash and still count against the quota for 30 days;")
+        print("        empty the trash after the pilot if the quota is tight.")
+
+
 # ----------------------------------------------------------------------------------------------- probe
 def memory_probe(root: Path, run: str, models, attn: str, global_batch: int):
     banner("COMMON MEMORY PROBE (largest micro-batch safe for ALL architectures)")
@@ -174,6 +206,10 @@ def main():
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--allow-data-rebuild", action="store_true")
     ap.add_argument("--backup-data-to-drive", action="store_true")
+    ap.add_argument("--ckpt-location", choices=["local", "drive"], default="local",
+                    help="where the resume checkpoint (5.7-7.0 GB, one per run, deleted when the run finishes) is written")
+    ap.add_argument("--final-weights-to-drive", action="store_true",
+                    help="write model_final_bf16.pt (~1 GB per run) to Drive instead of local disk")
     ap.add_argument("--skip-benchmark", action="store_true")
     ap.add_argument("--skip-profile", action="store_true")
     args = ap.parse_args()
@@ -190,6 +226,10 @@ def main():
         print(f"  restoring previous results from {drive_root}")
         shutil.copytree(drive_root, root, dirs_exist_ok=True)
     status = load_json(root / "pipeline_status.json") or {"phases": {}}
+    if args.ckpt_location == "drive" and drive_base is None:
+        raise SystemExit("--ckpt-location drive requires --drive-dir")
+    ckpt_parent = (drive_base / "checkpoints" / args.mode) if args.ckpt_location == "drive" else None
+    weights_parent = (drive_base / "weights" / args.mode) if (args.final_weights_to_drive and drive_base) else None
 
     def mark(phase, info=None):
         status["phases"][phase] = {"done": True, "time": time.strftime("%Y-%m-%d %H:%M:%S"), **(info or {})}
@@ -206,6 +246,7 @@ def main():
                                 "results would mix implementations. Use a fresh --out directory.")
         status["attention_backend"] = attn
         mark("env", {"attention_backend": attn})
+        disk_plan(root, models, args.mode, ckpt_parent, weights_parent)
 
         # PHASE 1 - data
         ensure_data(data_dir, drive_base, args.allow_data_rebuild, args.backup_data_to_drive)
@@ -273,7 +314,9 @@ def main():
                     continue
                 rc, _ = sh([PY, "scripts/run_experiment.py", "--model", name, "--run", args.mode, "--micro-batch", mb,
                             "--data-dir", data_dir, "--out", root / "runs", "--attention-backend", attn, "--seed", args.seed,
-                            "--dataset-report", root / "dataset_verification.json"],
+                            "--dataset-report", root / "dataset_verification.json"]
+                           + (["--ckpt-dir", ckpt_parent] if ckpt_parent else [])
+                           + (["--final-weights-dir", weights_parent] if weights_parent else []),
                            allow=(EXIT_OK, EXIT_SCIENTIFIC_FAILURE))
                 mark(f"train_{name}", {"exit_code": rc})
 

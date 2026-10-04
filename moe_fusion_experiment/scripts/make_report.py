@@ -167,7 +167,7 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
         w("| model | utilisation CV (mean over layers) | worst max/min ratio | min expert fraction | router entropy (max ln8=2.079) | alerts |\n|---|---|---|---|---|---|")
         for k, r in R.items():
             rf = r["router_final"]
-            alerts = [e["event"] for e in r["events"]]
+            alerts = [e["event"] for e in r["events"] if e["event"] != "checkpoint_saved"]
             w(f"| {k} | {_f(rf.get('util_cv_mean'), 3)} | {_f(rf.get('util_maxmin_ratio_max'), 2)} | {_f(rf.get('util_min_fraction'), 4)} | "
               f"{_f(rf.get('router_entropy'), 3)} | {', '.join(sorted(set(alerts))) or 'none'} |")
         w("")
@@ -198,7 +198,7 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
     w("\nTraces: `profiles/*.json` (open in https://ui.perfetto.dev). Method and caveats: `src/moefusion/trace_analysis.py`.\n")
 
     w("## O. Failures or anomalies\n")
-    anomalies = [f"{k}: {e}" for k, r in R.items() for e in r["events"]]
+    anomalies = [f"{k}: {e}" for k, r in R.items() for e in r["events"] if e["event"] != "checkpoint_saved"]
     anomalies += [f"failed run {f['dir']}" for f in res.get("failed_runs", [])]
     anomalies += (env.get("warnings") or []) + (ds.get("warnings") or [])
     w("\n".join(f"* {a}" for a in anomalies) if anomalies else "None recorded.")
