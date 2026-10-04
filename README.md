@@ -1,6 +1,4 @@
-Evet. **B kesinlikle gerekli**; yoksa C iyi çıkarsa bunun “fusion”dan mı yoksa sadece paralel mimariden mi geldiğini ayıramayız.
 
-Literatüre bakınca deneyin temeli de sağlam: paralel Attention–MLP yaklaşımının GPT-J/PaLM çizgisinde precedenti var; sublayer sırasının değiştirilebildiğini Sandwich Transformer göstermiş; MoE tarafında Switch, OLMoE, DeepSeekMoE ve Mixtral bize router/uzman tasarımı için iyi referanslar veriyor. [GitHub](https://github.com/QihongRuan/stanford-cs336-notes/blob/main/notes/lec03.md?utm_source=chatgpt.com)
 
 ## Deneyin ana sorusu
 
