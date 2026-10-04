@@ -34,7 +34,7 @@ def main():
                 rows = torch.randint(0, m.vocab_size, (args.mb, t.seq_len + 1), device=dev)
                 x, y = make_inputs_targets(rows, t.seq_len)
                 with autocast_ctx(t, dev):
-                    loss = lm_loss(model(x), y) + t.balance_coef * model.aux_losses()["balance_loss"]
+                    loss = lm_loss(model(x), y) + model.aux_penalty(t)
                 (loss / 2).backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()

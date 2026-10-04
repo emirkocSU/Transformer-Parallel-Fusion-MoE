@@ -14,8 +14,9 @@
 * **Same compute where it matters.** C_matched shrinks the expert width so that 15 x 1536 = 12 x 1920: total expert
   parameters and active MoE FLOPs are identical to A/B (0.000% difference, checked programmatically; the run stops
   if the mismatch exceeds 2%). Time differences in Experiment 2 can therefore not come from "doing more MoE work".
-* **Same auxiliary-loss weight.** The balance loss is averaged (not summed) over MoE applications, so the 15-MoE
-  models do not receive 25% more router regularisation.
+* **Same router regularisation.** Every router (MoE application) receives the same balance-loss weight 0.01, as in
+  Switch Transformer (summed over routers). A router in C is regularised exactly like a router in A; the logged
+  per-router balance loss (1.0 = balanced) is directly comparable across architectures (EXPERIMENT_SPEC Amendment 1).
 
 ## Same environment
 * All runs execute sequentially in ONE Colab session, on the same GPU, each in a fresh Python process (clean CUDA

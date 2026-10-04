@@ -200,7 +200,7 @@ class Trainer:
             x, y = make_inputs_targets(batch, tcfg.seq_len)
             with autocast_ctx(tcfg, dev):
                 out = model(x)
-                l = lm_loss(out, y) + tcfg.balance_coef * model.aux_losses()["balance_loss"]
+                l = lm_loss(out, y) + model.aux_penalty(tcfg)
             l.backward()
             opt.zero_grad(set_to_none=True)
             del out, l, batch, x, y
@@ -239,6 +239,7 @@ class Trainer:
             lm_acc = torch.zeros((), device=dev)
             bal_acc = torch.zeros((), device=dev)
             z_acc = torch.zeros((), device=dev)
+            pen_acc = torch.zeros((), device=dev)
             data_wait = 0.0
             for j in range(accum):
                 td = time.perf_counter()
@@ -249,18 +250,20 @@ class Trainer:
                     logits = model(x)
                     lm = lm_loss(logits, y)
                     aux = model.aux_losses()
-                    loss = lm + tcfg.balance_coef * aux["balance_loss"] + tcfg.zloss_coef * aux["z_loss"]
+                    aux_pen = model.aux_penalty(tcfg)
+                    loss = lm + aux_pen
                 (loss / accum).backward()
                 lm_acc += lm.detach() / accum
                 bal_acc += aux["balance_loss"].detach() / accum
+                pen_acc += aux_pen.detach() / accum
                 z_acc += aux["z_loss"].detach() / accum
                 rs = model.routing_stats()
                 interval_counts += rs["counts"]
                 interval_entropy += rs["entropy"]
                 interval_n += 1
-                del logits, lm, aux, loss, batch, x, y
+                del logits, lm, aux, aux_pen, loss, batch, x, y
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), tcfg.grad_clip)
-            lm_v, bal_v, z_v, gn_v = torch.stack([lm_acc, bal_acc, z_acc, grad_norm.float()]).tolist()
+            lm_v, bal_v, z_v, pen_v, gn_v = torch.stack([lm_acc, bal_acc, z_acc, pen_acc, grad_norm.float()]).tolist()
             if not (math.isfinite(lm_v) and math.isfinite(gn_v) and math.isfinite(bal_v)):
                 self._fail(evlog, step, f"non-finite value: lm={lm_v} grad_norm={gn_v} balance={bal_v}", model)
             lr = lr_at(step, tcfg)
@@ -277,7 +280,7 @@ class Trainer:
             state["data_wait"].append(data_wait)
             step_done = step + 1
             rec = {"step": step_done, "tokens": state["tokens"], "train_seconds": state["train_seconds"],
-                   "lm_loss": lm_v, "total_loss": lm_v + tcfg.balance_coef * bal_v + tcfg.zloss_coef * z_v,
+                   "lm_loss": lm_v, "total_loss": lm_v + pen_v, "aux_penalty": pen_v,
                    "balance_loss": bal_v, "z_loss": z_v, "lr": lr, "grad_norm": gn_v, "step_time": step_time,
                    "tokens_per_sec": tcfg.tokens_per_step / step_time, "data_wait": data_wait,
                    "epoch": sched.epoch_of_step(step_done)}
@@ -300,7 +303,12 @@ class Trainer:
                     if collapsed:
                         state["collapse_streak"] += 1
                         evlog.log({"step": step_done, "event": "router_collapse_warning", "layers": collapsed,
+                                   "layer_names": [model.moe_names()[i] for i in collapsed],
+                                   "fractions": [us["per_layer_fraction"][i] for i in collapsed],
                                    "streak": state["collapse_streak"]})
+                        self.log(f"[{self.run_name}] ROUTER COLLAPSE WARNING step {step_done}: "
+                                 + "; ".join(f"{model.moe_names()[i]} {[round(v, 3) for v in us['per_layer_fraction'][i]]}"
+                                             for i in collapsed) + f" (streak {state['collapse_streak']}/{tcfg.collapse_patience})")
                         if state["collapse_streak"] >= tcfg.collapse_patience:
                             self._fail(evlog, step, f"router collapse persisted in layers {collapsed}", model)
                     else:

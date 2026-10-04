@@ -29,7 +29,8 @@ train:
   eps: 1.0e-8
   weight_decay: 0.1
   grad_clip: 1.0
-  balance_coef: 0.01         # Switch Transformer alpha = 1e-2
+  balance_coef: 0.01         # Switch Transformer alpha = 1e-2, applied to EVERY router (MoE application)
+  aux_loss_reduction: sum    # sum over routers = Switch convention; identical pressure per router in A/B/C
   zloss_coef: 0.0            # z-loss logged as diagnostic only
   precision: bf16
   seed: 42

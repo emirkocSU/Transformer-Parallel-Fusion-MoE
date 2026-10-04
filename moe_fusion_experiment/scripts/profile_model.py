@@ -63,7 +63,7 @@ def _profile_one(m, t, args, dev, outdir, label):
 
     def step():
         with autocast_ctx(t, dev):
-            loss = lm_loss(model(x), y) + t.balance_coef * model.aux_losses()["balance_loss"]
+            loss = lm_loss(model(x), y) + model.aux_penalty(t)
         loss.backward()
         opt.step()
         opt.zero_grad(set_to_none=True)

@@ -66,12 +66,19 @@ class MoEFusionLM(nn.Module):
         return self.lm_head(self.norm_f(x))
 
     def aux_losses(self) -> Dict[str, torch.Tensor]:
-        """MEAN over all MoE applications, so that the total auxiliary-loss weight is identical
-        for architectures with different numbers of MoE layers (12 vs 15)."""
+        """Per-router auxiliary losses of the last forward pass: the MEAN over MoE applications (for logging;
+        1.0 = perfectly balanced) and the SUM over MoE applications (used in the objective, Switch convention)."""
         mods = self.moe_modules()
-        bal = torch.stack([m.last_aux["balance_loss"] for m in mods]).mean()
-        z = torch.stack([m.last_aux["z_loss"] for m in mods]).mean()
-        return {"balance_loss": bal, "z_loss": z}
+        bal = torch.stack([m.last_aux["balance_loss"] for m in mods])
+        z = torch.stack([m.last_aux["z_loss"] for m in mods])
+        return {"balance_loss": bal.mean(), "z_loss": z.mean(), "balance_loss_sum": bal.sum(), "z_loss_sum": z.sum()}
+
+    def aux_penalty(self, tcfg) -> torch.Tensor:
+        """Auxiliary term added to the LM loss. The single place where the objective's router terms are defined."""
+        a = self.aux_losses()
+        if tcfg.aux_loss_reduction == "sum":
+            return tcfg.balance_coef * a["balance_loss_sum"] + tcfg.zloss_coef * a["z_loss_sum"]
+        return tcfg.balance_coef * a["balance_loss"] + tcfg.zloss_coef * a["z_loss"]
 
     def routing_stats(self) -> Dict[str, torch.Tensor]:
         mods = self.moe_modules()

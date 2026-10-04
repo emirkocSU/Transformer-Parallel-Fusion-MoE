@@ -62,14 +62,14 @@ def model_benchmark(mcfg: ModelConfig, tcfg: TrainConfig, rows: torch.Tensor, wa
     def fwd_bwd():
         with autocast_ctx(tcfg, dev):
             out = model(x)
-            loss = lm_loss(out, y) + tcfg.balance_coef * model.aux_losses()["balance_loss"]
+            loss = lm_loss(out, y) + model.aux_penalty(tcfg)
         loss.backward()
         model.zero_grad(set_to_none=True)
 
     def step():
         with autocast_ctx(tcfg, dev):
             out = model(x)
-            loss = lm_loss(out, y) + tcfg.balance_coef * model.aux_losses()["balance_loss"]
+            loss = lm_loss(out, y) + model.aux_penalty(tcfg)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), tcfg.grad_clip)
         opt.step()

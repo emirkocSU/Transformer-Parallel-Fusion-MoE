@@ -120,6 +120,11 @@ class TrainConfig:
     weight_decay: float = 0.1
     grad_clip: float = 1.0
     balance_coef: float = 0.01
+    # "sum": every MoE application (router) adds balance_coef * L_balance to the objective, as in Switch Transformer
+    # ("for each Switch layer, this auxiliary loss is added to the total model loss"). Every router of every
+    # architecture therefore receives the SAME balancing pressure. "mean" (divide by the number of MoE
+    # applications) is kept only for ablations.
+    aux_loss_reduction: str = "sum"
     zloss_coef: float = 0.0
     precision: str = "bf16"
     seed: int = 42
@@ -138,6 +143,8 @@ class TrainConfig:
         if self.micro_batch_seqs is not None:
             if self.global_batch_seqs % self.micro_batch_seqs:
                 raise ValueError("global_batch_seqs must be divisible by micro_batch_seqs")
+        if self.aux_loss_reduction not in ("sum", "mean"):
+            raise ValueError("aux_loss_reduction must be 'sum' or 'mean'")
         if self.precision not in ("bf16", "fp32"):
             raise ValueError("precision must be bf16 or fp32")
         if self.total_steps < 1:

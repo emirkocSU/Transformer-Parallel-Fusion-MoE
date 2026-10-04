@@ -44,7 +44,7 @@ Two experiments are read from the same four runs:
 | LR | peak 3e-4, linear warm-up 2% of steps, cosine to 3e-5 |
 | clipping | global norm 1.0 |
 | precision | BF16 autocast; FP32 master weights, router, norms, softmax/cross-entropy; TF32 disabled |
-| aux loss | Switch balance loss, coefficient 0.01, MEAN over all MoE applications (12 or 15) |
+| aux loss | Switch balance loss, coefficient 0.01 **per MoE application (router), summed** -- see Amendment 1 |
 | z-loss | logged, coefficient 0 |
 | init | per-parameter generator seeded by (seed, name, shape): A and B bit-identical, C shares every common tensor |
 | attention | one backend for all runs, chosen once in Phase 0 (FlashAttention-2 via SDPA when available) |
@@ -88,6 +88,20 @@ NaN/Inf loss or gradient -> run stopped, `failure.json`, pipeline continues with
 failure is reported. Router collapse (<= top_k experts with >= 1% of assignments in a layer for 3 consecutive
 logging intervals after warm-up) -> run stopped and reported; any router fix must be applied to all architectures and
 all runs restarted. OOM -> only micro-batch/accumulation may change (for all models), never the architecture.
+
+## 6a. Amendment 1 (before any pilot comparison run)
+
+*Original rule:* balance loss averaged over MoE applications (0.01 x mean over 12 or 15 routers).
+*Problem found in the A100 smoke stage* (24 steps, no comparison data yet): per-router balance loss stayed at
+1.17-1.52 (1.0 = balanced), utilisation CV rose to 1.28 and A_serial raised a router-collapse warning. Averaging gives
+each router only 0.01/12 (A, B) or 0.01/15 (C) of balancing pressure: 12-15x weaker than the cited reference and
+**not equal across architectures**. Switch Transformer adds the auxiliary loss for EACH switch layer.
+*New rule:* 0.01 x L_balance for every router, summed (`aux_loss_reduction: sum`). Every router of every
+architecture now receives identical pressure. Evidence before adoption (tiny CPU model, same data/seed, stressed
+LR 3e-3, 40 steps): mean -> 6 collapse warnings and one persistent collapse (C_same stopped), per-router balance
+1.05-1.15; sum -> 0 warnings, 1.01-1.02, unchanged LM loss. Applied identically to A, B and C; no pilot comparison had
+been run. The smoke router criterion was aligned with the training guard (a transient early warning is recorded;
+a persistent collapse or a collapsed layer in the final interval fails the smoke stage).
 
 ## 7. Phases
 

@@ -15,7 +15,7 @@ import torch
 
 from moefusion.config import load_experiment
 from moefusion.data import TokenDataset
-from moefusion.metrics import read_jsonl
+from moefusion.metrics import collapse_check, read_jsonl
 from moefusion.trainer import Trainer, TrainingFailure
 from moefusion.utils import configure_torch_numerics, write_json
 
@@ -47,14 +47,22 @@ def main():
             checks["checkpoint_resumed"] = True
             tr = read_jsonl(out / "train_metrics.jsonl")
             ev = read_jsonl(out / "eval_metrics.jsonl")
-            first, last = tr[0]["lm_loss"], sum(x["lm_loss"] for x in tr[-4:]) / 4
-            checks["train_loss_decreased"] = last < first - 0.5
+            first, last_loss = tr[0]["lm_loss"], sum(x["lm_loss"] for x in tr[-4:]) / 4
+            checks["train_loss_decreased"] = last_loss < first - 0.5
             checks["val_loss_decreased"] = s["final_periodic_subset_val_loss"] < ev[0]["val_loss"] - 0.5
             checks["finite"] = all(x["lm_loss"] == x["lm_loss"] for x in tr)
             evs = read_jsonl(out / "events.jsonl")
-            checks["no_router_collapse"] = not any(e["event"] in ("router_collapse_warning", "FATAL") for e in evs)
+            # Same rule as the training guard: transient early warnings are recorded; a persistent collapse
+            # (FATAL) or a collapsed layer in the LAST logging interval fails the smoke stage.
+            last_rec = next(x for x in reversed(tr) if "per_layer_fraction" in x)
+            final_collapsed = collapse_check(last_rec["per_layer_fraction"], m.top_k, t.collapse_min_fraction)
+            transient = [e for e in evs if e["event"] == "router_collapse_warning"]
+            checks["no_router_collapse"] = not any(e["event"] == "FATAL" for e in evs) and not final_collapsed
+            report_extra = {"transient_collapse_warnings": transient, "final_collapsed_layers": final_collapsed,
+                            "final_util_cv_mean": last_rec.get("util_cv_mean"),
+                            "final_balance_loss_per_router": last_rec.get("balance_loss")}
             checks["evaluation_works"] = bool(ev) and ev[-1].get("final") is True
-            report[name] = {"checks": checks, "first_train_loss": first, "last_train_loss_mean4": last,
+            report[name] = {"checks": checks, "first_train_loss": first, "last_train_loss_mean4": last_loss, **report_extra,
                             "initial_val_loss": ev[0]["val_loss"], "final_val_loss": s["final_val_loss"],
                             "tokens_per_sec": s["tokens_per_sec_overall"], "steps": s["steps"]}
         except TrainingFailure as e:

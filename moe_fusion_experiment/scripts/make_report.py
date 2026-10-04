@@ -84,7 +84,7 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
           f"micro-batch {r0.get('micro_batch_seqs')} x grad-accum {r0.get('grad_accum')} (common to all, from the memory probe), "
           f"AdamW({tc.get('beta1')}, {tc.get('beta2')}, wd {tc.get('weight_decay')}), peak LR {tc.get('lr')}, "
           f"{100 * (tc.get('warmup_frac') or 0):.0f}% linear warm-up, cosine to {tc.get('min_lr_ratio')} x peak, clip {tc.get('grad_clip')}, "
-          f"balance-loss coefficient {tc.get('balance_coef')} (mean over MoE applications), z-loss coefficient {tc.get('zloss_coef')} "
+          f"balance-loss coefficient {tc.get('balance_coef')} per router ({tc.get('aux_loss_reduction')} over MoE applications), z-loss coefficient {tc.get('zloss_coef')} "
           "(always logged), BF16 autocast with FP32 master weights / router / norms / loss.\n"
           "* Same data order (BatchSchedule seeded by the paired seed), same evaluation points, same validation rows; "
           "evaluation and checkpoint time excluded from the wall-clock axis.\n")
