@@ -208,6 +208,27 @@ class Trainer:
         if dev.type == "cuda":
             torch.cuda.reset_peak_memory_stats()
 
+        # ---- routing-stability probe (StableMoE's "routing fluctuation", Dai et al. 2022): top-k expert choice of a FIXED
+        # set of validation tokens, recorded at every periodic evaluation; churn = fraction of tokens whose top-1 expert
+        # (or top-k set) changed since the previous evaluation. Excluded from train_seconds.
+        routed_model = mcfg.n_experts > mcfg.top_k
+        probe_rows = np.arange(min(8, len(self.data.val)))
+        prev_route = {"snap": None}
+
+        def routing_snapshot():
+            mods = model.moe_modules()
+            for m_ in mods:
+                m_.keep_routing = True
+            try:
+                with torch.no_grad(), autocast_ctx(tcfg, dev):
+                    xb, _ = make_inputs_targets(rows_to_tensor(self.data.val, probe_rows, dev), tcfg.seq_len)
+                    model(xb)
+                return [m_.last_routing["topi"].to(torch.int16).cpu() for m_ in mods]
+            finally:
+                for m_ in mods:
+                    m_.keep_routing = False
+                    m_.last_routing = {}
+
         def do_eval(step_done: int, final: bool = False):
             rows = val_rows_final if final else val_rows_periodic
             r = evaluate(model, self.data.val, rows, mb, tcfg, dev, return_per_seq=final)
@@ -215,6 +236,16 @@ class Trainer:
             rec = {"step": step_done, "tokens": state["tokens"], "train_seconds": state["train_seconds"],
                    "elapsed_seconds": time.perf_counter() - t_wall0, "final": final,
                    **{k: v for k, v in r.items() if k != "per_seq_loss"}}
+            if routed_model and not final:
+                snap = routing_snapshot()
+                prev = prev_route["snap"]
+                if prev is not None:
+                    top1 = [float((a[:, 0] != b[:, 0]).float().mean()) for a, b in zip(snap, prev)]
+                    topk = [float((a.sort(dim=1).values != b.sort(dim=1).values).any(dim=1).float().mean())
+                            for a, b in zip(snap, prev)]
+                    rec.update({"routing_churn_top1_mean": float(np.mean(top1)), "routing_churn_topk_mean": float(np.mean(topk)),
+                                "routing_churn_top1_per_layer": [round(v, 5) for v in top1]})
+                prev_route["snap"] = snap
             elog.log(rec)
             if final:
                 np.save(self.out / "final_val_per_sequence_loss.npy", r["per_seq_loss"])
@@ -299,7 +330,8 @@ class Trainer:
                 interval_entropy.zero_()
                 interval_n = 0
                 # ---- router collapse guard (recorded; stops only if persistent) ----
-                if step_done > tcfg.warmup_steps:
+                routed = mcfg.n_experts > mcfg.top_k  # dense control (1 expert): no routing to monitor
+                if routed and step_done > tcfg.warmup_steps:
                     collapsed = collapse_check(np.asarray(us["per_layer_fraction"]), mcfg.top_k, tcfg.collapse_min_fraction)
                     if collapsed:
                         state["collapse_streak"] += 1
@@ -321,7 +353,8 @@ class Trainer:
                         imbalance_flag = severe
                 # ---- dead/starved-expert monitor (all steps, monitoring only) ----
                 frac = np.asarray(us["per_layer_fraction"])
-                dead_layers = [int(i) for i in np.nonzero((frac < tcfg.dead_expert_fraction).any(axis=1))[0]]
+                dead_layers = ([int(i) for i in np.nonzero((frac < tcfg.dead_expert_fraction).any(axis=1))[0]]
+                               if routed else [])
                 rec["dead_expert_layers"] = len(dead_layers)
                 if bool(dead_layers) != dead_flag:
                     evlog.log({"step": step_done, "event": "dead_expert_alert" if dead_layers else "dead_expert_cleared",

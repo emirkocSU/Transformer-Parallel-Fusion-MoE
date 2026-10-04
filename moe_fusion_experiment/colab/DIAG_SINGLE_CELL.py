@@ -1,23 +1,21 @@
 # ==================================================================================================
-#  A/B/C MoE FUSION DENEYİ — MAIN (100M token, seed 42) TEK HÜCRE  (Google Colab, A100)
+#  A/B/C MoE FUSION DENEYİ — TEŞHİS (DIAG) AŞAMASI, TEK HÜCRE  (Google Colab, A100)
+#  Soru: pilotta B (paralel) neden A'yı (seri) 0,18 nat geçti? 4 grup x (A,B) pilot bütçesinde (25M token):
+#  seed42 (yeniden temel) | dense kontrol | warm-up %10 | seed43  + router kararlılığı ölçümü. ~1,7 saat.
+#  Sonuç: /content/moe_fusion_runs/DIAG_REPORT.md (önceden kayıtlı R1-R4 kuralları). MAIN'den ÖNCE çalıştırın.
 #  Çalışma zamanı: Runtime > Change runtime type > A100 GPU.  Hücreyi bir kez çalıştırın.
 #  Kod zip'i (moe_fusion_experiment.zip, sürüm aşağıda) bulunamazsa Colab yükleme penceresi açılır.
 #  Veri /content'te yoksa Drive yedeğinden (MyDrive/moe_fusion_experiment/moe_data) otomatik geri yüklenir.
 #  Bağlantı koparsa hücreyi tekrar çalıştırın: tamamlanan aşamalar ve TAMAMLANAN koşular atlanır;
 #  yarıda kalan koşu (yeni oturumda) baştan başlar. Tarayıcı sekmesini açık tutun.
 # ==================================================================================================
-RUN_MODE = "main"                  # "smoke" | "pilot" | "main"
-MODELS = "B_parallel,C_parallel_fusion_samewidth,C_parallel_fusion_matched,A_serial"  # koşu sırası (fusion önce)
-SEED = 42
+RUN_MODE = "diag"
 DATA_DIR = "/content/moe_data"     # mevcut veri klasörünüz (train.npy, validation.npy, tokenizer.json, ...)
 PROJECT_DIR = "/content/moe_fusion_experiment"
 OUT_DIR = "/content/moe_fusion_runs"
 USE_DRIVE = True                   # sonuçları (checkpoint hariç) Google Drive'a yedekler
 DRIVE_DIR = "/content/drive/MyDrive/moe_fusion_experiment"
 BACKUP_DATA_TO_DRIVE = True        # veri setini bir kez Drive'a kopyalar (sonraki oturumlar için)
-CHECKPOINT_LOCATION = "local"      # "local": devam checkpoint'i yerel diskte (koşu başına TEK dosya, 5.7-7.0 GB, koşu bitince silinir)
-                                   # "drive": Drive'a yazılır -> bağlantı kopsa bile yeni oturumda kaldığı adımdan devam eder
-FINAL_WEIGHTS_TO_DRIVE = True      # model_final_bf16.pt (~1 GB/koşu) yerel disk yerine Drive'a
 ALLOW_DATA_REBUILD = True          # veri yerelde ve Drive'da yoksa: sabit FineWeb-Edu sürümünden yeniden üret
                                    # (orijinal manifestin sha256'larıyla bit düzeyinde karşılaştırılır)
 FORCE_REUPLOAD = False             # True: mevcut kodu silip zip'i yeniden yükle
@@ -25,11 +23,7 @@ EXPECTED_VERSION = "1.4.0"
 
 import glob, os, re, shutil, subprocess, sys, time, zipfile
 
-assert RUN_MODE in ("smoke", "pilot", "main"), RUN_MODE
-print(f"RUN_MODE = {RUN_MODE}   MODELS = {MODELS}   SEED = {SEED}")
-if RUN_MODE == "main":
-    print("Plan: 4 model x 1526 adım x 65.536 token = 100.007.936 token/model. Pilot hızlarına göre tahmini toplam süre "
-          "~3-3,3 saat (B ve A ~40 dk, C_same ~47 dk, C_matched ~44 dk + kurulum/test/smoke ~15 dk).")
+print("TEŞHİS planı: 8 koşu x 384 adım x 65.536 token (pilot bütçesi); micro-batch 16 (pilotla aynı). Tahmini ~1,7 saat.")
 
 # ---- 1) GPU hızlı kontrol --------------------------------------------------------------------------
 smi = subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"], capture_output=True, text=True)
@@ -138,17 +132,11 @@ if need:
 # ---- 5) Pipeline: ortam -> veri (Drive'dan geri yükleme + sha256 doğrulama) -> testler -> bütçe -> bellek probu ->
 #         smoke -> eğitimler (MODELS sırasıyla) -> karar/analiz/grafik/rapor -> zip --------------------------
 #         (MAIN'de benchmark/profil yapılmaz: pilotta ölçüldü, token sayısından bağımsız) -----------------
-cmd = [sys.executable, "scripts/run_pipeline.py", "--mode", RUN_MODE, "--data-dir", DATA_DIR, "--out", OUT_DIR,
-       "--models", MODELS, "--seed", str(SEED)]
+cmd = [sys.executable, "scripts/run_diagnostics.py", "--data-dir", DATA_DIR, "--out", OUT_DIR]
 if USE_DRIVE:
     cmd += ["--drive-dir", DRIVE_DIR]
     if BACKUP_DATA_TO_DRIVE:
         cmd += ["--backup-data-to-drive"]
-    if FINAL_WEIGHTS_TO_DRIVE:
-        cmd += ["--final-weights-to-drive"]
-    cmd += ["--ckpt-location", CHECKPOINT_LOCATION]
-elif CHECKPOINT_LOCATION == "drive":
-    print("UYARI: Drive bağlı değil; checkpoint yerel diske yazılacak.")
 if ALLOW_DATA_REBUILD:
     cmd += ["--allow-data-rebuild"]
 t0 = time.time()
@@ -159,20 +147,30 @@ for line in proc.stdout:
 rc = proc.wait()
 print(f"\nPipeline çıkış kodu {rc}  ({(time.time() - t0) / 60:.1f} dk)")
 
-# ---- 6) Sonuçları göster ---------------------------------------------------------------------------
-root = os.path.join(OUT_DIR, RUN_MODE)
+# ---- 6) Sonuçları göster ve paketle --------------------------------------------------------------------
+import shutil as _sh
 from IPython.display import Image, Markdown, display
 
-rep = os.path.join(root, "FINAL_REPORT.md")
-if os.path.exists(rep):
-    display(Markdown(open(rep, encoding="utf-8").read().split("## Plots")[0]))
-    for png in ("loss_vs_wallclock", "loss_vs_tokens", "ppl_vs_wallclock", "step_time_comparison", "throughput_comparison",
-                "vram_comparison", "expert_utilization", "benchmark_step_time"):
-        p = os.path.join(root, "plots", f"{png}.png")
-        if os.path.exists(p):
-            display(Image(p))
-zp = os.path.join(OUT_DIR, f"moe_fusion_{RUN_MODE}_results.zip")
-if os.path.exists(zp):
+drep = os.path.join(OUT_DIR, "DIAG_REPORT.md")
+if os.path.exists(drep):
+    display(Markdown(open(drep, encoding="utf-8").read()))
+    for _t in ("diag_seed42", "diag_dense", "diag_warmup10", "diag_seed43"):
+        _p = os.path.join(OUT_DIR, _t, "plots", "loss_vs_tokens.png")
+        if os.path.exists(_p):
+            print(_t)
+            display(Image(_p))
+    _tmp = "/content/_diag_pack"
+    _sh.rmtree(_tmp, ignore_errors=True)
+    os.makedirs(_tmp)
+    for _t in ("diag_seed42", "diag_dense", "diag_warmup10", "diag_seed43"):
+        if os.path.isdir(os.path.join(OUT_DIR, _t)):
+            _sh.copytree(os.path.join(OUT_DIR, _t), os.path.join(_tmp, _t), ignore=_sh.ignore_patterns("*.pt", "*.tmp"))
+    for _f in ("DIAG_REPORT.md", "DIAG_SUMMARY.json"):
+        _sh.copy2(os.path.join(OUT_DIR, _f), _tmp)
+    zp = _sh.make_archive(os.path.join(OUT_DIR, "moe_fusion_diag_results"), "zip", _tmp)
+    _sh.rmtree(_tmp, ignore_errors=True)
+    if USE_DRIVE:
+        _sh.copy2(zp, DRIVE_DIR)
     print("Sonuç arşivi:", zp, "(Drive kopyası:", DRIVE_DIR if USE_DRIVE else "yok", ")")
     try:
         from google.colab import files
@@ -180,4 +178,4 @@ if os.path.exists(zp):
     except Exception:
         pass
 if rc != 0:
-    print("Pipeline durdu. Yukarıdaki 'PIPELINE STOPPED' satırı nedeni gösterir; düzeltip hücreyi tekrar çalıştırın.")
+    print("Teşhis durdu. Yukarıdaki 'STOPPED' satırı nedeni gösterir; hücreyi tekrar çalıştırın (tamamlananlar atlanır).")

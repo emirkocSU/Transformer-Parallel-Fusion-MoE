@@ -13,7 +13,8 @@ from moefusion.analysis import (EQUIV_MARGIN, SPEED_MARGIN, classify_diff, fairn
                                 loss_at_common_wallclock, multi_seed_summary, paired_diff, time_to_targets)
 from moefusion.utils import read_json, write_json
 
-SHORT = {"A_serial": "A", "B_parallel": "B", "C_parallel_fusion_samewidth": "C_same", "C_parallel_fusion_matched": "C_matched"}
+SHORT = {"A_serial": "A", "B_parallel": "B", "C_parallel_fusion_samewidth": "C_same", "C_parallel_fusion_matched": "C_matched",
+         "A_dense": "A", "B_dense": "B"}  # dense controls are analysed as the A/B pair of their own diagnostic group
 PAIRS = [("B", "A", "Q1: B vs A (cost of removing same-layer Attention->MoE dependency)"),
          ("C_same", "B", "Q2: C_same vs B (effect of periodic fusion, extra compute)"),
          ("C_same", "A", "C_same vs A (NOT a compute-fair comparison)"),

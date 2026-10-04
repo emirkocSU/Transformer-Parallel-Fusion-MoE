@@ -25,7 +25,8 @@ MARK = {"A": "o", "B": "s", "C_same": "^", "C_matched": "D"}
 LABEL = {"A": "A serial", "B": "B parallel", "C_same": "C parallel+fusion (same width)",
          "C_matched": "C parallel+fusion (matched)"}
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
-SHORT = {"A_serial": "A", "B_parallel": "B", "C_parallel_fusion_samewidth": "C_same", "C_parallel_fusion_matched": "C_matched"}
+SHORT = {"A_serial": "A", "B_parallel": "B", "C_parallel_fusion_samewidth": "C_same", "C_parallel_fusion_matched": "C_matched",
+         "A_dense": "A", "B_dense": "B"}  # dense controls are analysed as the A/B pair of their own diagnostic group
 
 
 def _style():

@@ -124,6 +124,33 @@ collapse guard did not flag.
   (then judged per wall-clock: C_same vs B at the common training time); NOT USEFUL if C_same is approximately equal
   to or worse than B; otherwise INCONCLUSIVE. Single-seed results are reported as not replicated.
 
+## 6c. Amendment 3 -- DIAGNOSTIC phase (written before any diagnostic run; to be run BEFORE MAIN)
+
+*Question:* is the pilot's B > A gap (0.179 nats) a real effect (e.g. the parallel block keeps the MoE router more stable
+early in training) or an artefact of seed, recipe or regime? All groups use the pilot budget (384 steps x 65,536 tokens),
+micro-batch 16 (= pilot), the same data and code; each group is analysed on its own (paired B - A on the full
+validation set).
+
+| group | models | change vs pilot |
+|---|---|---|
+| diag_seed42 | A_serial, B_parallel | none (re-baseline with the current code) |
+| diag_dense | A_dense, B_dense | dense SwiGLU FFN, hidden 3840 = 2 x 1920 (identical active FFN FLOPs; = 1-expert top-1 MoE, constant router) |
+| diag_warmup10 | A_serial, B_parallel | warm-up 10% (38 steps) instead of 2% (8 steps) |
+| diag_seed43 | A_serial, B_parallel | seed 43 (init + data order) |
+
+D4: every MoE run records the top-1 expert of a fixed 8,192-token validation probe at each evaluation; churn = fraction
+of probe tokens whose top-1 expert changed since the previous evaluation (StableMoE routing fluctuation).
+
+*Rules* (d = paired B - A; margin 0.02 nats):
+* **R1 seed:** ROBUST if d(seed 43) has the sign of d(seed 42) and both |d| >= 0.02.
+* **R2 dense:** MoE-SPECIFIC if the dense gap has the opposite sign or |d_dense| < 0.5 |d_moe|; otherwise not MoE-specific.
+* **R3 warm-up:** LARGELY EXPLAINED by early training if |d_warmup10| <= 0.5 |d_seed42|.
+* **R4 routing:** SUPPORTS routing fluctuation if A's mean churn over the first quarter >= 1.5 x B's; does not if <= 1.1x.
+* **Overall:** not robust -> gap not established (seed noise or < 0.02 nats); robust and R3 explained -> warm-up artefact; robust, MoE-specific and R4
+  supports -> real MoE routing-stability effect; robust and MoE-specific without R4 -> real but mechanism unconfirmed;
+  robust and not MoE-specific -> property of the regime/recipe, not of MoE routing.
+These rules decide what to test next; single runs per condition are not replication.
+
 ## 7. Phases
 
 0 environment, 1 data verification, 2 unit tests, 3 budget, 4 memory probe, 5 smoke, 6 systems benchmark,

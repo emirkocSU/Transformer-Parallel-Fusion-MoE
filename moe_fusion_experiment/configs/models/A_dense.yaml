@@ -1,0 +1,8 @@
+# DIAG D2 (dense control): serial block with a DENSE SwiGLU FFN (= MoE with 1 expert, top-1; the router is constant and
+# receives no gradient). Hidden 3840 = top_k(2) x 1920 -> identical active FFN FLOPs/token to A/B.
+model:
+  name: A_dense
+  arch: serial
+  n_experts: 1
+  top_k: 1
+  expert_hidden: 3840

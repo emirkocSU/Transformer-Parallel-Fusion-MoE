@@ -211,6 +211,11 @@ def main():
                     help="where the resume checkpoint (5.7-7.0 GB, one per run, deleted when the run finishes) is written")
     ap.add_argument("--final-weights-to-drive", action="store_true",
                     help="write model_final_bf16.pt (~1 GB per run) to Drive instead of local disk")
+    ap.add_argument("--run", default=None, help="run config name (configs/runs/<run>.yaml); default = --mode")
+    ap.add_argument("--tag", default=None, help="results directory name under --out (default = --mode)")
+    ap.add_argument("--micro-batch", type=int, default=None, help="force the micro-batch (skips the memory probe)")
+    ap.add_argument("--skip-tests", action="store_true", help="only when the same code already passed the tests")
+    ap.add_argument("--skip-smoke", action="store_true", help="only when the same models already passed smoke")
     ap.add_argument("--with-systems", action="store_true",
                     help="MAIN: also re-run benchmark/profiling (default: skipped; measured in the pilot, token-independent)")
     ap.add_argument("--skip-benchmark", action="store_true")
@@ -221,11 +226,13 @@ def main():
     models = args.models.split(",")
     if args.mode == "main" and not args.with_systems:
         args.skip_benchmark = args.skip_profile = True
-    root = Path(args.out) / args.mode
+    args.run = args.run or args.mode
+    args.tag = args.tag or args.mode
+    root = Path(args.out) / args.tag
     root.mkdir(parents=True, exist_ok=True)
     data_dir = Path(args.data_dir)
     drive_base = Path(args.drive_dir) if args.drive_dir else None
-    drive_root = drive_base / "runs" / args.mode if drive_base else None
+    drive_root = drive_base / "runs" / args.tag if drive_base else None
     # restore results of a previous session from Drive (completed runs are then skipped)
     if drive_root is not None and drive_root.exists() and not (root / "pipeline_status.json").exists():
         print(f"  restoring previous results from {drive_root}")
@@ -233,8 +240,8 @@ def main():
     status = load_json(root / "pipeline_status.json") or {"phases": {}}
     if args.ckpt_location == "drive" and drive_base is None:
         raise SystemExit("--ckpt-location drive requires --drive-dir")
-    ckpt_parent = (drive_base / "checkpoints" / args.mode) if args.ckpt_location == "drive" else None
-    weights_parent = (drive_base / "weights" / args.mode) if (args.final_weights_to_drive and drive_base) else None
+    ckpt_parent = (drive_base / "checkpoints" / args.tag) if args.ckpt_location == "drive" else None
+    weights_parent = (drive_base / "weights" / args.tag) if (args.final_weights_to_drive and drive_base) else None
 
     def mark(phase, info=None):
         status["phases"][phase] = {"done": True, "time": time.strftime("%Y-%m-%d %H:%M:%S"), **(info or {})}
@@ -251,45 +258,58 @@ def main():
                                 "results would mix implementations. Use a fresh --out directory.")
         status["attention_backend"] = attn
         mark("env", {"attention_backend": attn})
-        disk_plan(root, models, args.mode, ckpt_parent, weights_parent)
+        disk_plan(root, models, args.run, ckpt_parent, weights_parent)
 
         # PHASE 1 - data
         ensure_data(data_dir, drive_base, args.allow_data_rebuild, args.backup_data_to_drive)
         sys.path.insert(0, str(ROOT / "src"))
         from moefusion.config import load_experiment
 
-        mcfg0, tcfg = load_experiment(models[0], args.mode)
+        mcfg0, tcfg = load_experiment(models[0], args.run)
         sh([PY, "scripts/verify_dataset.py", "--data-dir", data_dir, "--out", root, "--seq-len", tcfg.seq_len,
             "--vocab-size", mcfg0.vocab_size])
         mark("dataset")
 
         # PHASE 2 - unit tests (CPU + CUDA tests on this GPU)
         banner("UNIT TESTS (pytest)")
-        (root / "tests").mkdir(exist_ok=True)
-        rc, _ = sh([PY, "-m", "pytest", "-q", "-rA", "tests", f"--junitxml={root / 'tests' / 'junit.xml'}"], allow=(0, 1))
-        import xml.etree.ElementTree as ET
+        if args.skip_tests:
+            print("  skipped (--skip-tests: the same code version already passed the full test suite in this session)")
+        else:
+            (root / "tests").mkdir(exist_ok=True)
+            rc, _ = sh([PY, "-m", "pytest", "-q", "-rA", "tests", f"--junitxml={root / 'tests' / 'junit.xml'}"], allow=(0, 1))
+            import xml.etree.ElementTree as ET
 
-        ts = ET.parse(root / "tests" / "junit.xml").getroot()
-        ts = ts if ts.tag == "testsuite" else ts.find("testsuite")
-        summ = {k: int(ts.get(k, 0)) for k in ("tests", "failures", "errors", "skipped")}
-        summ["passed"] = rc == 0
-        save_json(root / "tests" / "pytest_summary.json", summ)
-        print(f"  pytest: {summ}")
-        if rc != 0:
-            raise PipelineError("unit tests failed - no training is started")
-        mark("tests", summ)
+            ts = ET.parse(root / "tests" / "junit.xml").getroot()
+            ts = ts if ts.tag == "testsuite" else ts.find("testsuite")
+            summ = {k: int(ts.get(k, 0)) for k in ("tests", "failures", "errors", "skipped")}
+            summ["passed"] = rc == 0
+            save_json(root / "tests" / "pytest_summary.json", summ)
+            print(f"  pytest: {summ}")
+            if rc != 0:
+                raise PipelineError("unit tests failed - no training is started")
+            mark("tests", summ)
 
         # PHASE 3 - parameter / FLOP budget
-        sh([PY, "scripts/inspect_models.py", "--run", args.mode, "--models", ",".join(models), "--out", root])
+        sh([PY, "scripts/inspect_models.py", "--run", args.run, "--models", ",".join(models), "--out", root])
         mark("inspect")
 
         # PHASE 4 - common micro-batch
-        mb = memory_probe(root, args.mode, models, attn, tcfg.global_batch_seqs)
+        if args.micro_batch:
+            mb = args.micro_batch
+            if tcfg.global_batch_seqs % mb:
+                raise PipelineError(f"--micro-batch {mb} does not divide the global batch {tcfg.global_batch_seqs}")
+            save_json(root / "probe.json", {"micro_batch": mb, "grad_accum": tcfg.global_batch_seqs // mb,
+                                            "forced": True, "models": models})
+            print(f"  micro-batch forced to {mb} (identical to the reference experiment); memory probe skipped")
+        else:
+            mb = memory_probe(root, args.run, models, attn, tcfg.global_batch_seqs)
         status["micro_batch"] = mb
         mark("probe", {"micro_batch": mb})
 
         # PHASE 5 - smoke
-        if not (load_json(root / "smoke" / "smoke_report.json") or {}).get("passed"):
+        if args.skip_smoke:
+            print("  smoke skipped (--skip-smoke: these models already passed smoke in this session)")
+        elif not (load_json(root / "smoke" / "smoke_report.json") or {}).get("passed"):
             sh([PY, "scripts/run_smoke.py", "--models", ",".join(models), "--micro-batch", mb, "--data-dir", data_dir,
                 "--out", root, "--attention-backend", attn])
             mark("smoke")
@@ -300,14 +320,14 @@ def main():
             # PHASE 6 - systems benchmark
             if not args.skip_benchmark and not (root / "benchmark" / "benchmark.json").exists():
                 # systems measurement: a failure is recorded and reported, it never blocks the training comparison
-                rc, _ = sh([PY, "scripts/benchmark_models.py", "--run", args.mode, "--micro-batch", mb, "--data-dir",
+                rc, _ = sh([PY, "scripts/benchmark_models.py", "--run", args.run, "--micro-batch", mb, "--data-dir",
                             data_dir, "--out", root, "--attention-backend", attn], allow=tuple(range(256)))
                 if rc != 0:
                     print(f"  WARNING: benchmark exited with code {rc}; continuing with training (see report)")
                 mark("benchmark", {"exit_code": rc})
             # PHASE 7 - profiling
             if not args.skip_profile and not (root / "profiles" / "overlap_analysis.json").exists():
-                rc, _ = sh([PY, "scripts/profile_model.py", "--run", args.mode, "--micro-batch", mb, "--out", root,
+                rc, _ = sh([PY, "scripts/profile_model.py", "--run", args.run, "--micro-batch", mb, "--out", root,
                             "--attention-backend", attn], allow=tuple(range(256)))
                 if rc != 0:
                     print(f"  WARNING: profiling exited with code {rc}; continuing with training (see report)")
@@ -322,7 +342,7 @@ def main():
                 if (run_dir / "failure.json").exists():
                     print(f"  {name}: previously FAILED (see failure.json) - not re-run automatically")
                     continue
-                rc, _ = sh([PY, "scripts/run_experiment.py", "--model", name, "--run", args.mode, "--micro-batch", mb,
+                rc, _ = sh([PY, "scripts/run_experiment.py", "--model", name, "--run", args.run, "--micro-batch", mb,
                             "--data-dir", data_dir, "--out", root / "runs", "--attention-backend", attn, "--seed", args.seed,
                             "--dataset-report", root / "dataset_verification.json"]
                            + (["--ckpt-dir", ckpt_parent] if ckpt_parent else [])
@@ -335,8 +355,8 @@ def main():
             mark("report")
 
         # PHASE 10 - package
-        zip_base = Path(args.out) / f"moe_fusion_{args.mode}_results"
-        tmp = Path(args.out) / f"_pack_{args.mode}"
+        zip_base = Path(args.out) / f"moe_fusion_{args.tag}_results"
+        tmp = Path(args.out) / f"_pack_{args.tag}"
         if tmp.exists():
             shutil.rmtree(tmp)
         shutil.copytree(root, tmp, ignore=shutil.ignore_patterns("*.pt", "*.tmp"))

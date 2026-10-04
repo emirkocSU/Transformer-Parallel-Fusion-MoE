@@ -145,3 +145,21 @@ def test_dead_expert_monitor_logs_events(tmp_path):
     assert any(e["event"] == "dead_expert_alert" for e in ev)
     tr = read_jsonl(tmp_path / "r" / "train_metrics.jsonl")
     assert all("dead_expert_layers" in r for r in tr if "per_layer_fraction" in r)
+
+
+def test_routing_churn_recorded_and_dense_has_no_routing_alerts(tmp_path):
+    data = _data(tmp_path)
+    t = tiny_train_cfg(total_steps=6, eval_every=2, log_every=2)
+    Trainer(tiny_model_cfg("A"), t, data, tmp_path / "moe", "cpu", "moe", save_final_weights=False,
+            log_fn=lambda *a: None).run(resume=False)
+    ev = [e for e in read_jsonl(tmp_path / "moe" / "eval_metrics.jsonl") if not e["final"]]
+    churn = [e for e in ev if "routing_churn_top1_mean" in e]
+    assert len(churn) == len(ev) - 1  # every periodic eval except the first one
+    assert all(0.0 <= e["routing_churn_top1_mean"] <= 1.0 for e in churn)
+    dense = tiny_model_cfg("A", n_experts=1, top_k=1, expert_hidden=96)
+    s = Trainer(dense, tiny_train_cfg(total_steps=6, eval_every=2, log_every=2, dead_expert_fraction=0.99), data,
+                tmp_path / "dense", "cpu", "dense", save_final_weights=False, log_fn=lambda *a: None).run(resume=False)
+    assert s["steps"] == 6
+    evs = read_jsonl(tmp_path / "dense" / "events.jsonl")
+    assert not any(e["event"] in ("dead_expert_alert", "router_collapse_warning", "FATAL") for e in evs)
+    assert not any("routing_churn_top1_mean" in e for e in read_jsonl(tmp_path / "dense" / "eval_metrics.jsonl"))

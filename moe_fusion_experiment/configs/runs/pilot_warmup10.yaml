@@ -1,0 +1,9 @@
+# DIAG D3: identical to pilot.yaml except a 10% linear warm-up (38 steps instead of 8).
+train:
+  total_steps: 384
+  eval_every: 32
+  eval_seqs: 1024
+  final_eval_seqs: null
+  log_every: 8
+  ckpt_every: 128
+  warmup_frac: 0.10

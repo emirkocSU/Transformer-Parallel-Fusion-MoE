@@ -1,0 +1,7 @@
+# DIAG D2 (dense control): parallel block (PaLM formulation) with the same dense SwiGLU FFN as A_dense.
+model:
+  name: B_dense
+  arch: parallel
+  n_experts: 1
+  top_k: 1
+  expert_hidden: 3840

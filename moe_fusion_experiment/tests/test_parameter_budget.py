@@ -81,3 +81,17 @@ def test_verdict_rule_single_and_two_seeds():
     assert small["comparisons"]["C_matched_minus_B"]["verdict"].startswith("worse")
     two = multi_seed_summary(ps({42: (-0.03, 0.0, 5.0), 43: (0.01, 0.0, 5.05)}))  # direction flips between seeds
     assert two["comparisons"]["C_same_minus_B"]["verdict"].startswith("inconclusive")
+
+
+def test_dense_control_matches_moe_active_compute():
+    from moefusion.flop_counter import analytic_budget
+
+    a, _ = load_experiment("A_serial", "pilot", config_dir=REAL_CONFIGS)
+    ad, _ = load_experiment("A_dense", "pilot", config_dir=REAL_CONFIGS)
+    bd, _ = load_experiment("B_dense", "pilot", config_dir=REAL_CONFIGS)
+    ba, bad = analytic_budget(a), analytic_budget(ad)
+    assert bad["flops_fwd_moe_per_token"] == ba["flops_fwd_moe_per_token"]  # same active FFN FLOPs/token
+    assert ad.n_experts == 1 and ad.top_k == 1 and bd.arch == "parallel" and ad.arch == "serial"
+    _, tw = load_experiment("A_serial", "pilot_warmup10", config_dir=REAL_CONFIGS)
+    _, tp = load_experiment("A_serial", "pilot", config_dir=REAL_CONFIGS)
+    assert tw.warmup_steps == 38 and tp.warmup_steps == 8 and tw.total_steps == tp.total_steps

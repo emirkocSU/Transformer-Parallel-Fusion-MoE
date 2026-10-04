@@ -55,7 +55,9 @@ def main():
             # Same rule as the training guard: transient early warnings are recorded; a persistent collapse
             # (FATAL) or a collapsed layer in the LAST logging interval fails the smoke stage.
             last_rec = next(x for x in reversed(tr) if "per_layer_fraction" in x)
-            final_collapsed = collapse_check(last_rec["per_layer_fraction"], m.top_k, t.collapse_min_fraction)
+            # a single-expert (dense control) layer cannot collapse: there is nothing to route
+            final_collapsed = (collapse_check(last_rec["per_layer_fraction"], m.top_k, t.collapse_min_fraction)
+                               if m.n_experts > m.top_k else [])
             transient = [e for e in evs if e["event"] == "router_collapse_warning"]
             checks["no_router_collapse"] = not any(e["event"] == "FATAL" for e in evs) and not final_collapsed
             report_extra = {"transient_collapse_warnings": transient, "final_collapsed_layers": final_collapsed,
