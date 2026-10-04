@@ -1,0 +1,7 @@
+# Experiment 2 (compute/parameter matched): 15 x 1536 = 12 x 1920 = 23040 expert-hidden units.
+model:
+  name: C_parallel_fusion_matched
+  arch: parallel_fusion
+  expert_hidden: 1536
+  fusion_interval: 4
+  matched_reference_hidden: 1920

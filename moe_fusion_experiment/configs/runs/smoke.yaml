@@ -1,0 +1,8 @@
+# ~1.6M training tokens per architecture. Purpose: loss decreases, no NaN, ckpt/eval/profiling work.
+train:
+  total_steps: 24
+  eval_every: 8
+  eval_seqs: 64
+  final_eval_seqs: 256
+  log_every: 4
+  ckpt_every: 12

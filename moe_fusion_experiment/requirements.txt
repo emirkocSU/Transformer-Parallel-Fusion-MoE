@@ -1,0 +1,10 @@
+# Colab already provides torch (do NOT reinstall/upgrade it). Only missing packages are installed.
+torch>=2.3
+numpy>=1.24
+pyyaml>=6.0
+tokenizers>=0.15
+matplotlib>=3.7
+pytest>=7.0
+psutil>=5.9
+# only for the fallback dataset rebuild:
+# datasets>=2.18

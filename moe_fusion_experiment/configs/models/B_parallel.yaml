@@ -1,0 +1,4 @@
+model:
+  name: B_parallel
+  arch: parallel
+  expert_hidden: 1920

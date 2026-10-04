@@ -1,0 +1,4 @@
+model:
+  name: A_serial
+  arch: serial
+  expert_hidden: 1920

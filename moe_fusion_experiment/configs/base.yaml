@@ -1,0 +1,36 @@
+# Shared by EVERY architecture. Architecture files may only set: name, arch, expert_hidden,
+# fusion_interval, matched_reference_hidden (enforced by moefusion.config.assert_fair).
+model:
+  vocab_size: 32000          # = tokenizer.json vocabulary (ByteLevel BPE)
+  d_model: 768
+  n_layers: 12               # backbone depth (attention layers) -- identical for A/B/C
+  n_heads: 12
+  head_dim: 64
+  max_seq_len: 1024
+  n_experts: 8
+  top_k: 2
+  rope_theta: 10000.0
+  norm_eps: 1.0e-6
+  tie_embeddings: true
+  init_std: 0.02
+  attention_backend: sdpa_flash   # validated at runtime; one backend for all runs
+  moe_backend: reference          # correctness reference (no token dropping)
+  parallel_backend: reference     # primary comparison: identical sequential kernel dispatch
+
+train:
+  seq_len: 1024
+  global_batch_seqs: 64      # 64 x 1024 = 65,536 tokens per optimizer step (all archs)
+  micro_batch_seqs: null     # set by the common memory probe (largest size safe for ALL archs)
+  lr: 3.0e-4
+  min_lr_ratio: 0.1
+  warmup_frac: 0.02
+  beta1: 0.9
+  beta2: 0.95
+  eps: 1.0e-8
+  weight_decay: 0.1
+  grad_clip: 1.0
+  balance_coef: 0.01         # Switch Transformer alpha = 1e-2
+  zloss_coef: 0.0            # z-loss logged as diagnostic only
+  precision: bf16
+  seed: 42
+  data_seed: null            # null -> equals seed (paired design)

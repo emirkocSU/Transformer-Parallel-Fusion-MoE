@@ -1,0 +1,8 @@
+# 384 steps x 65,536 = 25,165,824 training tokens per architecture (~25M, spec: 20-30M).
+train:
+  total_steps: 384
+  eval_every: 32             # 12 periodic evaluations on a fixed 1,024-sequence subset (~1.05M tokens)
+  eval_seqs: 1024
+  final_eval_seqs: null      # final evaluation on the FULL validation set (15,088 sequences)
+  log_every: 8
+  ckpt_every: 128

@@ -1,0 +1,9 @@
+[project]
+name = "moefusion"
+version = "1.0.0"
+description = "A/B/C experiment: serial vs parallel vs parallel+periodic-fusion MoE Transformers"
+requires-python = ">=3.9"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"

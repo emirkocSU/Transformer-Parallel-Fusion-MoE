@@ -1,0 +1,6 @@
+# Experiment 1 (mechanism): same expert width as A/B -> C has 3 extra MoE applications (intentional).
+model:
+  name: C_parallel_fusion_samewidth
+  arch: parallel_fusion
+  expert_hidden: 1920
+  fusion_interval: 4
