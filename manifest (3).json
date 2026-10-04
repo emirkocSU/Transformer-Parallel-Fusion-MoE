@@ -1,0 +1,46 @@
+{
+  "dataset": "HuggingFaceFW/fineweb-edu",
+  "configuration": "sample-10BT",
+  "revision": "87f09149ef4734204d70ed1d046ddc9ca3f2b8f9",
+  "source_split": "train",
+  "source_order": "first N documents",
+  "created_at": "2026-10-04T02:10:58.914572+00:00",
+  "script_version": 1,
+  "git_commit": null,
+  "source_document_count": 300000,
+  "train_documents": 285000,
+  "validation_documents": 15000,
+  "validation_modulus": 20,
+  "source_files": {
+    "train": "/content/moe_data/train_documents.jsonl",
+    "validation": "/content/moe_data/validation_documents.jsonl"
+  },
+  "source_sha256": {
+    "train": "14df52576d446752586096943d12ead31381d5882c9ef4eca8c6f61f61d959e3",
+    "validation": "8271a7dec5a2139317aadce4958e80ad37d108923172486e9a7c0b1455848cd7"
+  },
+  "tokenizer_id": "2a6d7dcaa8f5cfec135c835ff0cf5ffb14c1f9508c0cfb8113bfebc3883c2187",
+  "tokenizer_path": "/content/moe_data/tokenizer.json",
+  "vocab_size": 32000,
+  "special_tokens": [
+    "<|unk|>",
+    "<|endoftext|>"
+  ],
+  "context_length": 1024,
+  "packed": {
+    "train": {
+      "path": "/content/moe_data/train.npy",
+      "examples": 287264,
+      "source_tokens": 294446188,
+      "usable_tokens": 294158336,
+      "sha256": "d71d97d2b474234f14196cdba3fe8dda2f34e6c8c5b28716e637a7f7ac51d796"
+    },
+    "validation": {
+      "path": "/content/moe_data/validation.npy",
+      "examples": 15088,
+      "source_tokens": 15465797,
+      "usable_tokens": 15450112,
+      "sha256": "09b2dd93ef7ce6de862fac7f94d033377e79c0966e7d03e905090a9dae86de33"
+    }
+  }
+}
