@@ -17,7 +17,7 @@ FINAL_WEIGHTS_TO_DRIVE = True      # model_final_bf16.pt (~1 GB/koşu) yerel dis
 ALLOW_DATA_REBUILD = True          # veri yerelde ve Drive'da yoksa: sabit FineWeb-Edu sürümünden yeniden üret
                                    # (orijinal manifestin sha256'larıyla bit düzeyinde karşılaştırılır)
 FORCE_REUPLOAD = False             # True: mevcut kodu silip zip'i yeniden yükle
-EXPECTED_VERSION = "1.2.2"
+EXPECTED_VERSION = "1.2.3"
 
 import glob, os, re, shutil, subprocess, sys, time, zipfile
 

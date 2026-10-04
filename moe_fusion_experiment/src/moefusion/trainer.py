@@ -171,7 +171,8 @@ class Trainer:
                  "step_times": [], "data_wait": [], "collapse_streak": 0, "segments": []}
         start_step = 0
         if resume and ckpt_path.exists():
-            payload = load_checkpoint(ckpt_path, model, opt, map_location=dev, strict_config=self.cfg_dict)
+            payload = load_checkpoint(ckpt_path, model, opt, strict_config=self.cfg_dict)
+            del payload["model"], payload["optimizer"]  # free the CPU copy (several GB) right away
             start_step = payload["step"]
             state.update(payload["state"])
             if snap_dir.exists() and snap_dir.resolve() != self.out.resolve():

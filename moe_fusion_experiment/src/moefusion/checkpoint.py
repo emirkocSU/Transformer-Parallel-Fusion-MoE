@@ -28,11 +28,12 @@ def rng_state() -> Dict[str, Any]:
 
 
 def set_rng_state(st: Dict[str, Any]) -> None:
+    # RNG states must be CPU ByteTensors, whatever device the checkpoint was mapped to.
     random.setstate(st["python"])
     np.random.set_state(st["numpy"])
-    torch.set_rng_state(st["torch_cpu"])
+    torch.set_rng_state(st["torch_cpu"].cpu())
     if torch.cuda.is_available() and "torch_cuda" in st:
-        torch.cuda.set_rng_state_all(st["torch_cuda"])
+        torch.cuda.set_rng_state_all([s.cpu() for s in st["torch_cuda"]])
 
 
 def estimate_checkpoint_bytes(model, optimizer) -> int:
@@ -92,8 +93,11 @@ def save_checkpoint(path, model, optimizer, step: int, state: Dict[str, Any], co
     return info
 
 
-def load_checkpoint(path, model, optimizer, map_location="cpu", strict_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    payload = torch.load(path, map_location=map_location, weights_only=False)
+def load_checkpoint(path, model, optimizer, strict_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Always deserialised on the CPU: RNG states must be CPU tensors, and a 6-7 GB checkpoint must not create a
+    second copy in GPU memory. model/optimizer.load_state_dict copy every tensor to its parameter's device
+    (AdamW 'step' included, as required by the fused kernel)."""
+    payload = torch.load(path, map_location="cpu", weights_only=False)
     if strict_config is not None and payload.get("config") != strict_config:
         raise RuntimeError(f"CHECKPOINT MISMATCH: config stored in {path} differs from the current run config")
     model.load_state_dict(payload["model"])

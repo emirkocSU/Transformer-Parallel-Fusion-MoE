@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from conftest import tiny_model_cfg, tiny_train_cfg
+from conftest import requires_cuda, tiny_model_cfg, tiny_train_cfg
 from moefusion.data import TokenDataset
 from moefusion.metrics import read_jsonl
 from moefusion.trainer import Trainer
@@ -106,3 +106,29 @@ def test_checkpoint_skipped_when_disk_full(tmp_path, monkeypatch):
     assert s["steps"] == 6
     ev = read_jsonl(tmp_path / "r" / "events.jsonl")
     assert any(e["event"] == "checkpoint_SKIPPED" for e in ev)
+
+
+@requires_cuda
+def test_resume_on_cuda_bf16(tmp_path):
+    """The GPU path of checkpoint/resume (device mapping, RNG states, fused AdamW state) - the smoke stage uses it."""
+    data = _data(tmp_path)
+    mcfg = tiny_model_cfg("C", d_model=64, n_heads=1, head_dim=64)
+    tcfg = tiny_train_cfg(total_steps=6, ckpt_every=3, precision="bf16")
+    full = Trainer(mcfg, tcfg, data, tmp_path / "full", "cuda", "full", save_final_weights=False,
+                   log_fn=lambda *a: None, keep_final_state=True)
+    full.run(resume=False)
+    r1 = Trainer(mcfg, tcfg, data, tmp_path / "part", "cuda", "part", save_final_weights=False,
+                 log_fn=lambda *a: None, stop_after_step=3).run(resume=False)
+    assert r1["status"] == "interrupted"
+    resumed = Trainer(mcfg, tcfg, data, tmp_path / "part", "cuda", "part", save_final_weights=False,
+                      log_fn=lambda *a: None, keep_final_state=True)
+    s = resumed.run(resume=True)
+    assert s["steps"] == 6
+    for k, v in full.final_state_dict.items():
+        w = resumed.final_state_dict[k]
+        assert torch.isfinite(w).all(), k
+        # GPU kernels may differ in the last bits between processes; resume must stay numerically on track
+        assert torch.allclose(v, w, atol=2e-3, rtol=2e-2), k
+    a = [r["lm_loss"] for r in read_jsonl(tmp_path / "full" / "train_metrics.jsonl")]
+    b = [r["lm_loss"] for r in read_jsonl(tmp_path / "part" / "train_metrics.jsonl")]
+    assert len(a) == len(b) == 6 and np.allclose(a, b, atol=2e-2)
