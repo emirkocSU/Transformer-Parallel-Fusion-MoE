@@ -155,6 +155,10 @@ def fairness_audit(runs: Dict[str, Dict], allowed=("name", "arch", "expert_hidde
 #   equal      |mean d| < EQUIV_MARGIN and every |d_s| < EQUIV_MARGIN
 #   otherwise  inconclusive
 # ----------------------------------------------------------------------------------------------------------
+# Amendment 4: with a SINGLE seed the decision threshold is the seed-to-seed variability of an architecture difference
+# MEASURED in the diagnostic phase: B-A = -0.1719 (seed 42) vs -0.1189 (seed 43) -> |difference| = 0.053 nats.
+SINGLE_SEED_THRESHOLD = 0.053
+
 MULTI_SEED_KEYS = ["C_same_minus_B", "C_matched_minus_B", "C_matched_minus_C_same", "B_minus_A", "C_same_minus_A",
                    "C_matched_minus_A"]
 
@@ -189,7 +193,7 @@ def multi_seed_summary(per_seed: Dict[int, Dict]) -> Dict:
         ds = [per_seed[s]["paired"][key]["mean"] for s in seeds]
         cis = [per_seed[s]["paired"][key]["ci95_normal"] for s in seeds]
         spread = max(final[x]["spread"], final[y]["spread"])
-        threshold = max(EQUIV_MARGIN, spread)
+        threshold = max(EQUIV_MARGIN, spread) if len(seeds) > 1 else max(EQUIV_MARGIN, SINGLE_SEED_THRESHOLD)
         comps[key] = {"per_seed_d": dict(zip(seeds, ds)), "per_seed_ci": dict(zip(seeds, cis)), "mean_d": float(np.mean(ds)),
                       "seed_spread": spread if len(seeds) > 1 else None, "threshold": threshold,
                       "verdict": multi_seed_verdict(ds, cis, threshold)}
@@ -218,11 +222,13 @@ def multi_seed_summary(per_seed: Dict[int, Dict]) -> Dict:
         elif vs.startswith("approximately") or vs.startswith("worse"):
             fusion = "NOT USEFUL in this setting: adding fusion layers does not improve on the pure parallel model."
         else:
-            fusion = "INCONCLUSIVE: the fusion effect is below the pre-registered decision threshold."
+            fusion = ("INCONCLUSIVE: the fusion effect lies between the equivalence margin and the decision threshold; "
+                      "replicate B and the C variants with seed 43 before concluding.")
         if len(seeds) == 1:
             fusion += " (single seed: not replicated)"
     return {"seeds": seeds, "models": models, "final_loss": final, "comparisons": comps, "wallclock": wall,
             "fusion_verdict": fusion,
             "rule": "d_s = paired dL per seed; better/worse require the same sign with a CI excluding 0 in EVERY seed AND "
-                    "|mean d| >= max(%.2f nats, observed seed spread); equal requires |d| < %.2f nats in every seed."
-                    % (EQUIV_MARGIN, EQUIV_MARGIN)}
+                    "abs(mean d) >= threshold = max(%.2f, observed seed spread) [single seed: max(%.2f, %.3f measured in the "
+                    "diagnostic phase)]; equal requires abs(d) < %.2f nats in every seed; anything else is inconclusive."
+                    % (EQUIV_MARGIN, EQUIV_MARGIN, SINGLE_SEED_THRESHOLD, EQUIV_MARGIN)}

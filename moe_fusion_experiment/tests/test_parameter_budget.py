@@ -72,13 +72,17 @@ def test_verdict_rule_single_and_two_seeds():
                       "common_wallclock": {"loss": {"B": lb, "C_same": lb + d_same, "C_matched": lb + d_match}}}
         return out
 
-    one = multi_seed_summary(ps({42: (-0.005, -0.03, 5.0)}))
+    one = multi_seed_summary(ps({42: (-0.005, -0.06, 5.0)}))  # single seed: threshold 0.053 (Amendment 4)
     assert one["comparisons"]["C_same_minus_B"]["verdict"].startswith("approximately equal")
     assert one["comparisons"]["C_matched_minus_B"]["verdict"].startswith("better")
     assert one["fusion_verdict"].startswith("USEFUL") and "single seed" in one["fusion_verdict"]
-    small = multi_seed_summary(ps({42: (-0.012, 0.03, 5.0)}))  # CI excludes 0 but |dL| inside the 0.02 margin
+    small = multi_seed_summary(ps({42: (-0.012, 0.06, 5.0)}))  # CI excludes 0 but |dL| inside the 0.02 margin
     assert small["comparisons"]["C_same_minus_B"]["verdict"].startswith("approximately equal")
     assert small["comparisons"]["C_matched_minus_B"]["verdict"].startswith("worse")
+    mid = multi_seed_summary(ps({42: (-0.03, 0.04, 5.0)}))  # between 0.02 and 0.053 with one seed -> inconclusive
+    assert mid["comparisons"]["C_same_minus_B"]["verdict"].startswith("inconclusive")
+    assert mid["comparisons"]["C_matched_minus_B"]["verdict"].startswith("inconclusive")
+    assert mid["fusion_verdict"].startswith("INCONCLUSIVE")
     two = multi_seed_summary(ps({42: (-0.03, 0.0, 5.0), 43: (0.01, 0.0, 5.05)}))  # direction flips between seeds
     assert two["comparisons"]["C_same_minus_B"]["verdict"].startswith("inconclusive")
 

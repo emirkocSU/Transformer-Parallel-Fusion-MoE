@@ -151,6 +151,17 @@ of probe tokens whose top-1 expert changed since the previous evaluation (Stable
   robust and not MoE-specific -> property of the regime/recipe, not of MoE routing.
 These rules decide what to test next; single runs per condition are not replication.
 
+## 6d. Amendment 4 -- decision threshold for the single-seed MAIN (after the diagnostics, before MAIN)
+
+*Diagnostic results:* B - A = -0.1719 (seed 42), -0.1189 (seed 43), -0.1357 (dense control), -0.1971 (10% warm-up);
+R1 ROBUST, R2 NOT MoE-specific, R3 NOT explained by warm-up, R4 weak (A/B early routing churn 1.24x and 1.19x).
+The diagnostics also measured, for the first time, the seed-to-seed variability of an architecture difference:
+|(-0.1719) - (-0.1189)| = **0.053 nats**. The single-seed threshold of Amendment 2 (0.02) is below this noise.
+*New rule for single-seed MAIN verdicts:* better/worse require a CI excluding 0 AND |dL| >= 0.053 nats; |dL| < 0.02 is
+"approximately equal"; 0.02 <= |dL| < 0.053 is INCONCLUSIVE and triggers a seed-43 replication of B and the C
+variant(s) concerned before any conclusion. The worse-case value 0.053 is used (it includes the late B-seed-43
+validation uptick at step 384) rather than the smaller pre-uptick value, to avoid choosing the threshold favourably.
+
 ## 7. Phases
 
 0 environment, 1 data verification, 2 unit tests, 3 budget, 4 memory probe, 5 smoke, 6 systems benchmark,

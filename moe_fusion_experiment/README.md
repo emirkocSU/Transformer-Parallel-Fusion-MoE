@@ -11,7 +11,7 @@ A controlled architecture experiment for one question:
 
 ## DIAGNOSTICS (run BEFORE MAIN) — why did B beat A in the pilot?
 
-Paste [`colab/DIAG_SINGLE_CELL.py`](colab/DIAG_SINGLE_CELL.py) into one Colab cell (A100) and upload the zip (v1.4.0).
+Paste [`colab/DIAG_SINGLE_CELL.py`](colab/DIAG_SINGLE_CELL.py) into one Colab cell (A100) and upload the zip (v1.4.1).
 Four groups of A vs B at the pilot budget (seed 42, dense control, 10% warm-up, seed 43) plus routing-stability
 measurement, ~1.7 h; writes `/content/moe_fusion_runs/DIAG_REPORT.md` with the pre-registered rules R1-R4
 (EXPERIMENT_SPEC Amendment 3).
@@ -19,7 +19,7 @@ measurement, ~1.7 h; writes `/content/moe_fusion_runs/DIAG_REPORT.md` with the p
 ## MAIN (100M tokens, seed 42)
 
 Paste [`colab/MAIN_SINGLE_CELL.py`](colab/MAIN_SINGLE_CELL.py) into one Colab cell (A100) and run it; upload
-`moe_fusion_experiment.zip` (version 1.4.0) when asked. Runs B, C_same, C_matched, A for 100M tokens each (~3-3.3 h),
+`moe_fusion_experiment.zip` (version 1.4.1) when asked. Runs B, C_same, C_matched, A for 100M tokens each (~3-3.3 h),
 then writes `/content/moe_fusion_runs/main/FINAL_REPORT.md` with the pre-registered fusion verdict
 (EXPERIMENT_SPEC Amendment 2). Results are mirrored to `MyDrive/moe_fusion_experiment/runs/main/`.
 
