@@ -65,6 +65,10 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
           f"* Leakage check: {ds.get('separation')}\n"
           f"* Re-tokenisation provenance check: " +
           ", ".join(f"{k}: {v.get('status')} ({v.get('packing_mode')})" for k, v in (ds.get('tokenization_spot_check') or {}).items()) + "\n")
+        if ds.get("rebuild"):
+            rb = ds["rebuild"]
+            w(f"* Data was rebuilt from the pinned source by `prepare_fineweb.py`: byte-identical to the original "
+              f"preparation = **{rb.get('identical_to_original')}**; inferred conventions {rb.get('conventions')}.\n")
         if ds.get("warnings"):
             w("* Dataset warnings: " + "; ".join(ds["warnings"]) + "\n")
     w("## D. Tokenizer\n")

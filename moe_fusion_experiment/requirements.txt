@@ -6,5 +6,6 @@ tokenizers>=0.15
 matplotlib>=3.7
 pytest>=7.0
 psutil>=5.9
-# only for the fallback dataset rebuild:
-# datasets>=2.18
+# only for the dataset rebuild (scripts/prepare_fineweb.py; both preinstalled on Colab):
+pyarrow>=12
+huggingface_hub>=0.20

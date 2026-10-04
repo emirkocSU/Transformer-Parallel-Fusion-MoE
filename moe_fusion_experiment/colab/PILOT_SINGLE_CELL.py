@@ -14,9 +14,10 @@ BACKUP_DATA_TO_DRIVE = True        # veri setini bir kez Drive'a kopyalar (sonra
 CHECKPOINT_LOCATION = "local"      # "local": devam checkpoint'i yerel diskte (koşu başına TEK dosya, 5.7-7.0 GB, koşu bitince silinir)
                                    # "drive": Drive'a yazılır -> bağlantı kopsa bile yeni oturumda kaldığı adımdan devam eder
 FINAL_WEIGHTS_TO_DRIVE = True      # model_final_bf16.pt (~1 GB/koşu) yerel disk yerine Drive'a
-ALLOW_DATA_REBUILD = False         # veri hiçbir yerde yoksa FineWeb-Edu'dan yeniden üretmeye izin ver
+ALLOW_DATA_REBUILD = True          # veri yerelde ve Drive'da yoksa: sabit FineWeb-Edu sürümünden yeniden üret
+                                   # (orijinal manifestin sha256'larıyla bit düzeyinde karşılaştırılır)
 FORCE_REUPLOAD = False             # True: mevcut kodu silip zip'i yeniden yükle
-EXPECTED_VERSION = "1.1.0"
+EXPECTED_VERSION = "1.2.0"
 
 import glob, os, re, shutil, subprocess, sys, time, zipfile
 
@@ -87,10 +88,11 @@ for mod, pkg in (("yaml", "pyyaml"), ("tokenizers", "tokenizers"), ("matplotlib"
     except Exception:
         need.append(pkg)
 if ALLOW_DATA_REBUILD:
-    try:
-        __import__("datasets")
-    except Exception:
-        need.append("datasets")
+    for mod, pkg in (("pyarrow", "pyarrow"), ("huggingface_hub", "huggingface_hub")):
+        try:
+            __import__(mod)
+        except Exception:
+            need.append(pkg)
 if need:
     print("Kuruluyor:", need)
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", *need], check=True)

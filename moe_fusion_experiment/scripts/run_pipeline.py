@@ -23,7 +23,7 @@ from _common import CORE_MODELS, EXIT_OK, EXIT_SCIENTIFIC_FAILURE, ROOT, banner
 PY = sys.executable
 MB_CANDIDATES = [32, 16, 8, 4, 2, 1]
 DATA_FILES = ["train.npy", "validation.npy", "tokenizer.json", "manifest.json", "source_manifest.json", ".complete.json",
-              "train_documents.jsonl", "validation_documents.jsonl"]
+              "train_documents.jsonl", "validation_documents.jsonl", "rebuild_report.json"]
 
 
 class PipelineError(RuntimeError):
@@ -93,7 +93,8 @@ def ensure_data(data_dir: Path, drive_dir: Path, allow_rebuild: bool, backup: bo
         if not allow_rebuild:
             raise PipelineError(f"No dataset in {data_dir} (and none on Drive). Re-run with ALLOW_DATA_REBUILD=True "
                                 "to rebuild it from FineWeb-Edu.")
-        print("  dataset missing -> rebuilding with scripts/prepare_fineweb.py (fallback; NOT byte-identical to the original)")
+        print("  dataset missing locally and on Drive -> rebuilding from the pinned FineWeb-Edu revision with "
+              "scripts/prepare_fineweb.py; the result is checked byte-for-byte against the original manifest sha256")
         sh([PY, "scripts/prepare_fineweb.py", "--out", data_dir])
     if not (data_dir / "tokenizer.json").exists():
         shutil.copy2(ROOT / "data_reference" / "tokenizer.json", data_dir / "tokenizer.json")

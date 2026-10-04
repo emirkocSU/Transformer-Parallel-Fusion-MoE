@@ -32,6 +32,15 @@ def main():
 
     man, notes = load_manifest(d, DATA_REFERENCE)
     rep["manifest_notes"] = notes
+    if (d / "rebuild_report.json").exists():
+        rb = json.loads((d / "rebuild_report.json").read_text())
+        rep["rebuild"] = {"identical_to_original": rb.get("token_data_identical_to_original"),
+                          "conventions": rb.get("conventions"), "checks": rb.get("checks")}
+        print(f"  data was REBUILT by prepare_fineweb.py: byte-identical to the original = "
+              f"{rb.get('token_data_identical_to_original')}  conventions={rb.get('conventions')}")
+        if not rb.get("token_data_identical_to_original"):
+            warnings.append("rebuilt token data is NOT byte-identical to the original preparation (deterministic and "
+                            "shared by all architectures, but different files than the first preparation)")
     if man is None:
         warnings.append("no manifest.json found (neither in data dir nor reference copy)")
     elif notes.get("complete_marker_matches_manifest") is False:

@@ -17,6 +17,13 @@ A controlled architecture experiment for one question:
    `colab/A100_MoE_Fusion_Experiment.ipynb`) and run it.
 3. When asked, upload `moe_fusion_experiment.zip`. Everything up to the end of the pilot runs automatically.
 
+**If `/content/moe_data` is gone** (runtime reset): the pipeline first restores it from
+`MyDrive/moe_fusion_experiment/moe_data`; if no Drive copy exists it rebuilds it with `scripts/prepare_fineweb.py`
+from the pinned FineWeb-Edu revision (first 300k documents of `sample/10BT`, ~2.2 GB download, a few minutes).
+The rebuild infers the original split rule, EOT placement and dtype from the original manifest's exact token counts
+and accepts them only if the produced `train.npy` / `validation.npy` have the original sha256 (byte-identical);
+`rebuild_report.json` records the outcome. The data is then backed up to Drive so it is not lost again.
+
 **Disk / checkpoints.** One resume checkpoint per run exists at a time (fp32 weights + AdamW moments: 5.73 GB for
 A/B/C_matched, 7.01 GB for C_same) and is deleted when the run finishes. `CHECKPOINT_LOCATION = "local"` (default)
 needs ~14 GB transient local space for an atomic overwrite; if free space is short the old file is deleted first,
