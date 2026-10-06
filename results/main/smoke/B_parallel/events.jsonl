@@ -1,0 +1,6 @@
+{"step": 4, "event": "expert_imbalance_alert", "maxmin_ratio": 14.710671423937724}
+{"step": 8, "event": "dead_expert_alert", "layers": [2, 3, 4, 5, 7, 8, 9, 10, 11], "layer_names": ["block2", "block3", "block4", "block5", "block7", "block8", "block9", "block10", "block11"], "min_fraction": 3e-05}
+{"step": 16, "event": "expert_imbalance_alert", "maxmin_ratio": 118.63463281958296}
+{"step": 16, "event": "dead_expert_alert", "layers": [8, 11], "layer_names": ["block8", "block11"], "min_fraction": 0.0021}
+{"step": 24, "event": "expert_imbalance_cleared", "maxmin_ratio": 6.35397978072049}
+{"step": 24, "event": "dead_expert_cleared", "layers": [], "layer_names": [], "min_fraction": 0.03938}

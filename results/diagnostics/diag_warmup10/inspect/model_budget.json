@@ -1,0 +1,92 @@
+{
+  "rows": {
+    "A_serial": {
+      "analytic": {
+        "n_layers": 12,
+        "n_attention_layers": 12,
+        "n_moe_backbone": 12,
+        "n_moe_fusion": 0,
+        "n_moe_total": 12,
+        "expert_hidden": 1920,
+        "params_total": 477653760,
+        "params_embedding": 24576000,
+        "params_lm_head_untied": 0,
+        "params_attention": 28311552,
+        "params_router": 73728,
+        "params_experts": 424673280,
+        "params_norms": 19200,
+        "params_active_per_token": 159148800,
+        "params_active_nonembedding": 134572800,
+        "flops_fwd_linear_per_token": 318259200,
+        "flops_fwd_moe_per_token": 212336640,
+        "flops_fwd_attn_scores_per_token_full": 37748736,
+        "flops_fwd_attn_scores_per_token_causal": 18892800.0,
+        "flops_fwd_per_token": 356007936,
+        "flops_train_per_token": 1068023808,
+        "bf16_param_memory_gb": 0.95530752,
+        "fp32_param_plus_adam_memory_gb": 7.64246016,
+        "train_flops_total": 26877699179937792,
+        "tokens": 25165824
+      },
+      "measured": {
+        "total": 477653760,
+        "trainable": 477653760,
+        "embedding": 24576000,
+        "lm_head_untied": 0,
+        "attention": 28311552,
+        "router": 73728,
+        "experts_backbone": 424673280,
+        "experts_fusion": 0,
+        "norms": 19200,
+        "experts": 424673280
+      }
+    },
+    "B_parallel": {
+      "analytic": {
+        "n_layers": 12,
+        "n_attention_layers": 12,
+        "n_moe_backbone": 12,
+        "n_moe_fusion": 0,
+        "n_moe_total": 12,
+        "expert_hidden": 1920,
+        "params_total": 477653760,
+        "params_embedding": 24576000,
+        "params_lm_head_untied": 0,
+        "params_attention": 28311552,
+        "params_router": 73728,
+        "params_experts": 424673280,
+        "params_norms": 19200,
+        "params_active_per_token": 159148800,
+        "params_active_nonembedding": 134572800,
+        "flops_fwd_linear_per_token": 318259200,
+        "flops_fwd_moe_per_token": 212336640,
+        "flops_fwd_attn_scores_per_token_full": 37748736,
+        "flops_fwd_attn_scores_per_token_causal": 18892800.0,
+        "flops_fwd_per_token": 356007936,
+        "flops_train_per_token": 1068023808,
+        "bf16_param_memory_gb": 0.95530752,
+        "fp32_param_plus_adam_memory_gb": 7.64246016,
+        "train_flops_total": 26877699179937792,
+        "tokens": 25165824
+      },
+      "measured": {
+        "total": 477653760,
+        "trainable": 477653760,
+        "embedding": 24576000,
+        "lm_head_untied": 0,
+        "attention": 28311552,
+        "router": 73728,
+        "experts_backbone": 424673280,
+        "experts_fusion": 0,
+        "norms": 19200,
+        "experts": 424673280
+      }
+    }
+  },
+  "matched": {},
+  "fairness_notes": [
+    "B_parallel.name = B_parallel (vs A_serial: A_serial)",
+    "B_parallel.arch = parallel (vs A_serial: serial)"
+  ],
+  "errors": []
+}

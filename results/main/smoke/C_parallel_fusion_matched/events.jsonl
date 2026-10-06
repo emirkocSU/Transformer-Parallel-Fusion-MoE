@@ -1,0 +1,4 @@
+{"step": 4, "event": "expert_imbalance_alert", "maxmin_ratio": 23.314805624483043}
+{"step": 4, "event": "dead_expert_alert", "layers": [11], "layer_names": ["block9"], "min_fraction": 0.01153}
+{"step": 16, "event": "expert_imbalance_alert", "maxmin_ratio": 1003.4649681528663}
+{"step": 16, "event": "dead_expert_alert", "layers": [3, 7, 8, 14], "layer_names": ["block3", "block6", "block7", "fusion_after_block11"], "min_fraction": 0.00026}

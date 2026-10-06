@@ -38,3 +38,13 @@ project are listed with the source they come from.
     1/sqrt(N_residual)). 2019.
 21. PyTorch documentation: CUDA semantics - streams and backward passes; `torch.profiler`;
     `torch.nn.attention.sdpa_kernel`. https://pytorch.org/docs/stable/notes/cuda.html
+22. Black et al. *GPT-NeoX-20B: An Open-Source Autoregressive Language Model.* arXiv:2204.06745. (Parallel attention and
+    feed-forward block.)
+23. Dai et al. *StableMoE: Stable Routing Strategy for Mixture of Experts.* ACL 2022. arXiv:2204.08396. (Routing
+    fluctuation, used for the DIAG routing-churn metric.)
+24. Chen, Goodfellow & Shlens. *Net2Net: Accelerating Learning via Knowledge Transfer.* ICLR 2016. arXiv:1511.05641.
+    (Function-preserving growth; basis of the optional zero-initialised insertion in Amendment 5.)
+25. Gong et al. *Efficient Training of BERT by Progressively Stacking.* ICML 2019.  Shen et al. *Staged Training for
+    Transformer Language Models.* ICML 2022. arXiv:2203.06211.
+26. Komatsuzaki et al. *Sparse Upcycling: Training Mixture-of-Experts from Dense Checkpoints.* ICLR 2023.
+    arXiv:2212.05055.

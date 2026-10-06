@@ -1,0 +1,2 @@
+{"step": 128, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/diag_warmup10/runs/B_parallel_seed42/checkpoint.pt", "seconds": 17.636508563000007, "bytes_estimate": 5830149512, "deleted_old_first": false, "free_bytes_before": 67421552640}
+{"step": 256, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/diag_warmup10/runs/B_parallel_seed42/checkpoint.pt", "seconds": 18.50295635099974, "bytes_estimate": 5830149512, "deleted_old_first": false, "free_bytes_before": 61689139200}

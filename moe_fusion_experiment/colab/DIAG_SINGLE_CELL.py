@@ -19,7 +19,7 @@ BACKUP_DATA_TO_DRIVE = True        # veri setini bir kez Drive'a kopyalar (sonra
 ALLOW_DATA_REBUILD = True          # veri yerelde ve Drive'da yoksa: sabit FineWeb-Edu sürümünden yeniden üret
                                    # (orijinal manifestin sha256'larıyla bit düzeyinde karşılaştırılır)
 FORCE_REUPLOAD = False             # True: mevcut kodu silip zip'i yeniden yükle
-EXPECTED_VERSION = "1.4.1"
+EXPECTED_VERSION = "1.4.2"
 
 import glob, os, re, shutil, subprocess, sys, time, zipfile
 

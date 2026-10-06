@@ -1,0 +1,143 @@
+{
+  "data_dir": "/content/moe_data",
+  "manifest_notes": {
+    "manifest_sha256": "b7048343254d68acc67137799e4e6b1224699a4515c28b3463d99bf8497045da",
+    "complete_marker": {
+      "manifest_sha256": "b7048343254d68acc67137799e4e6b1224699a4515c28b3463d99bf8497045da",
+      "revision": "87f09149ef4734204d70ed1d046ddc9ca3f2b8f9"
+    },
+    "complete_marker_matches_manifest": true,
+    "manifest_equals_reference": true
+  },
+  "rebuild": {
+    "identical_to_original": true,
+    "conventions": {
+      "validation_rule": "doc_index % 20 == 0",
+      "eot_per_doc": 1,
+      "eot_placement": "append",
+      "dtype": "uint16",
+      "row_len": 1025,
+      "jsonl_format": "id_text_utf8"
+    },
+    "checks": {
+      "tokenizer_identical": true,
+      "split_eot_candidates_matching_token_counts": [
+        [
+          0,
+          1
+        ]
+      ],
+      "validation_npy_identical": true,
+      "train_npy_identical": true,
+      "jsonl_format_identified": "id_text_utf8",
+      "validation_jsonl_identical": true,
+      "train_jsonl_identical": true
+    }
+  },
+  "tokenizer": {
+    "path": "/content/moe_data/tokenizer.json",
+    "sha256": "2a6d7dcaa8f5cfec135c835ff0cf5ffb14c1f9508c0cfb8113bfebc3883c2187",
+    "model_type": "BPE",
+    "vocab_size": 32000,
+    "special_tokens": {
+      "<|unk|>": 0,
+      "<|endoftext|>": 1
+    },
+    "eot_id": 1,
+    "pre_tokenizer": "ByteLevel"
+  },
+  "arrays": {
+    "checks": [
+      "train: token ids within [0, 32000)",
+      "train: row count matches manifest (287264)",
+      "train: usable (predicted) tokens match manifest (294158336)",
+      "train: sha256 matches manifest",
+      "validation: token ids within [0, 32000)",
+      "validation: row count matches manifest (15088)",
+      "validation: usable (predicted) tokens match manifest (15450112)",
+      "validation: sha256 matches manifest"
+    ],
+    "warnings": [],
+    "errors": [],
+    "train": {
+      "shape": [
+        287264,
+        1025
+      ],
+      "dtype": "uint16",
+      "min_token": 1,
+      "max_token": 31999,
+      "eot_count": 284999,
+      "row_layout": "seq_len+1 (input=row[:-1], target=row[1:])",
+      "sha256_file": "d71d97d2b474234f14196cdba3fe8dda2f34e6c8c5b28716e637a7f7ac51d796"
+    },
+    "validation": {
+      "shape": [
+        15088,
+        1025
+      ],
+      "dtype": "uint16",
+      "min_token": 1,
+      "max_token": 31999,
+      "eot_count": 14999,
+      "row_layout": "seq_len+1 (input=row[:-1], target=row[1:])",
+      "sha256_file": "09b2dd93ef7ce6de862fac7f94d033377e79c0966e7d03e905090a9dae86de33"
+    },
+    "passed": true
+  },
+  "separation": {
+    "train_docs": 285000,
+    "val_docs": 15000,
+    "source_ids_available": true,
+    "source_id_overlap": 0,
+    "exact_text_overlap_docs": 13,
+    "exact_text_overlap_fraction_of_val": 0.0008666666666666666,
+    "duplicate_texts_within_val": 0,
+    "passed": true
+  },
+  "tokenization_spot_check": {
+    "validation": {
+      "status": "VERIFIED",
+      "packing_mode": "append",
+      "n_docs": 200,
+      "details": {
+        "append": {
+          "compared_tokens": 180484,
+          "match": true,
+          "first_mismatch": null,
+          "match_fraction": 1.0
+        },
+        "prepend": {
+          "compared_tokens": 180484,
+          "match": false,
+          "first_mismatch": 0,
+          "match_fraction": 0.00021054497905631525
+        }
+      }
+    },
+    "train": {
+      "status": "VERIFIED",
+      "packing_mode": "append",
+      "n_docs": 200,
+      "details": {
+        "append": {
+          "compared_tokens": 172121,
+          "match": true,
+          "first_mismatch": null,
+          "match_fraction": 1.0
+        },
+        "prepend": {
+          "compared_tokens": 172121,
+          "match": false,
+          "first_mismatch": 0,
+          "match_fraction": 0.0001510565241893784
+        }
+      }
+    }
+  },
+  "errors": [],
+  "warnings": [
+    "13 validation documents have an exact-text duplicate in train under different source ids (web near-duplicates; reported, not removed)"
+  ],
+  "passed": true
+}

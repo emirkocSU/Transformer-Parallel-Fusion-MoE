@@ -5,7 +5,7 @@ from pathlib import Path
 
 import _common  # noqa: F401
 
-from moefusion.analysis import EQUIV_MARGIN, SPEED_MARGIN
+from moefusion.analysis import EQUIV_MARGIN, SINGLE_SEED_THRESHOLD, SPEED_MARGIN
 from moefusion.utils import fmt_num, now_iso, read_json
 
 
@@ -42,8 +42,10 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
     if mode == "main":
         seeds = res.get("seeds") or []
         w(f"> **STATUS: MAIN, seed(s) {seeds}.** 100M training tokens per model. "
-          + ("With a single seed the seed-to-seed variance is unknown: differences below the pre-registered 0.02-nat "
-             "threshold are not interpretable, and no result is replicated.\n" if len(seeds) <= 1 else "\n"))
+          + (f"With a single seed, differences below the pre-registered {SINGLE_SEED_THRESHOLD}-nat single-seed "
+             "threshold (EXPERIMENT_SPEC Amendment 4, measured seed spread) are not decisive, and no result is "
+             "replicated.\n" if len(seeds) <= 1 else "\n"))
+    ms_cmp = (res.get("multi_seed") or {}).get("comparisons") or {}
     ms = res.get("multi_seed")
     if ms:
         w("## VERDICT (pre-registered rule, EXPERIMENT_SPEC Amendment 2)\n")
@@ -241,9 +243,11 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
     anomalies += (env.get("warnings") or []) + (ds.get("warnings") or [])
     w("\n".join(f"* {a}" for a in anomalies) if anomalies else "None recorded.")
     w("\n## P. Statistical uncertainty\n")
-    w("Single paired seed. Paired CIs over validation sequences quantify evaluation noise only. Seed-to-seed variance "
-      "of small LMs is typically of the same order as the effects of interest, so differences below the pre-registered "
-      f"margin ({EQUIV_MARGIN} nats) - and any difference before the 3-seed replication - must be treated as provisional.\n")
+    n_seeds = len(res.get("seeds") or []) or 1
+    w(("Single paired seed" if n_seeds == 1 else f"{n_seeds} paired seeds") + ". Paired CIs over validation sequences quantify evaluation noise only, not seed-to-seed "
+      "training variance. The decision rule therefore uses the observed seed spread (single seed: "
+      f"{SINGLE_SEED_THRESHOLD} nats measured in the diagnostic phase, Amendment 4) and the {EQUIV_MARGIN}-nat "
+      "equivalence margin; a 'CI excludes 0' classification alone is not a verdict.\n")
 
     # ---------------------------------------------------------------- answers
     w("## Q. Answers to the pre-registered questions\n")
@@ -256,7 +260,9 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
     q2 = pst("C_same_minus_B")
     w(f"\n**Q2 - recovered by C:** " + (f"MEASURED dL(C_same-B) = {_ci(q2)}; recovered fraction of the B-A gap: "
       f"{_f(rec.get('recovered_by_C_same'), 2)} (C_same), {_f(rec.get('recovered_by_C_matched'), 2)} (C_matched). "
-      f"INTERPRETATION: fusion effect {q2['classification']}." + ("" if rec.get("gap_significant") else
+      f"INTERPRETATION: CI-only classification {q2['classification']}"
+      + (f"; pre-registered verdict: {ms_cmp['C_same_minus_B']['verdict']}" if "C_same_minus_B" in ms_cmp else "")
+      + "." + ("" if rec.get("gap_significant") else
       " The recovered fraction is undefined because B is not significantly worse than A.") if q2 else "n/a"))
     q3 = pst("C_matched_minus_A")
     w(f"\n**Q3 - does C help when compute is matched:** " + (f"MEASURED dL(C_matched-A) = {_ci(q3)}, dL(C_matched-B) = "
@@ -299,7 +305,9 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
         promising = q10["ci95_normal"][1] < 0
         w(f"\n**Q10 - is fusion_interval=4 promising enough for 2/8/final-only ablations?** Pre-registered rule: yes if dL(C_same-B) "
           f"has a 95% CI entirely below 0. MEASURED: {_ci(q10)} -> **{'YES (provisional)' if promising else 'NOT by the pre-registered rule'}**"
-          + (" - pilot only; confirm in MAIN before spending ablation compute." if mode != "main" else ""))
+          + (" - pilot only; confirm in MAIN before spending ablation compute." if mode != "main" else
+             (f" Under the decision threshold the effect is: {ms_cmp['C_same_minus_B']['verdict']}; see the "
+              "Amendment 5 plan before running ablations." if "C_same_minus_B" in ms_cmp else "")))
     w("\n## R. Limitations\n")
     w("* Small scale (12 layers, d 768, ~160M active / ~480-590M total params, 25M-100M tokens): evidence is small-scale "
       "architectural evidence, not a claim about billion/trillion-parameter LLMs.\n"
@@ -307,13 +315,22 @@ def write_report(root: Path, res: dict, plots: dict) -> Path:
       "* Hyperparameters were NOT tuned per architecture (by design); a recipe tuned for A could favour A.\n"
       "* Wall-clock depends on this implementation (reference MoE with one host sync per MoE layer, SDPA attention) and "
       "on Colab conditions; runs are sequential in one session, the systems benchmark interleaves models to control drift.\n"
-      "* The periodic validation curve uses a fixed 1,024-sequence subset; final numbers use the full validation set.\n")
+      + "* Time-to-target and loss at common wall-clock read intermediate points of a cosine schedule sized for the "
+      "full token budget; such intermediate points are pessimistic relative to a run whose schedule ends there "
+      "(Hoffmann et al. 2022), which biases these two metrics against the slower model.\n"
+      + "* The periodic validation curve uses a fixed %s-sequence subset; final numbers use the full validation set.\n"
+      % (", ".join(sorted({f"{r['train_config'].get('eval_seqs', 0):,}" for r in R.values()})) or "n/a"))
     w("## S. Recommended next experiment\n")
-    w("* If the fairness audit passed and no run failed: run MAIN (100M tokens) for the same four models, then the 3-seed "
-      "replication (seeds 42/43/44) before any strong conclusion.\n"
-      "* Run the fusion-interval ablation (2 / 8 / final-only, compute-matched widths from `matched_hidden`) only if Q10 "
-      "is positive in MAIN.\n"
-      "* Systems track (separate label): fused Attention/MoE input projections and concurrent execution in training.\n")
+    if mode == "main":
+        w("* Follow the pre-registered plan in EXPERIMENT_SPEC Amendment 5: (1) iso-FLOP baseline (B trained on the extra "
+          "compute that C_same spends), (2) fusion-layer knock-out on the trained C_same weights, (3) single-fusion-layer "
+          "variant against its own iso-FLOP B, (4) seed replication of whatever remains undecided.\n")
+    else:
+        w("* If the fairness audit passed and no run failed: run MAIN (100M tokens) for the same four models, then a seed "
+          "replication before any strong conclusion.\n"
+          "* Run the fusion-interval ablation (2 / 8 / final-only, compute-matched widths from `matched_hidden`) only if "
+          "Q10 is positive in MAIN.\n")
+    w("* Systems track (separate label): fused Attention/MoE input projections and concurrent execution in training.\n")
     w("## Plots\n")
     for k, p in plots.items():
         w(f"![{k}](plots/{Path(p).name})")

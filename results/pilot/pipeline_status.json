@@ -1,0 +1,72 @@
+{
+  "phases": {
+    "env": {
+      "done": true,
+      "time": "2026-10-04 17:21:21",
+      "attention_backend": "sdpa_flash"
+    },
+    "dataset": {
+      "done": true,
+      "time": "2026-10-04 17:21:45"
+    },
+    "tests": {
+      "done": true,
+      "time": "2026-10-04 17:22:05",
+      "tests": 61,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": true
+    },
+    "inspect": {
+      "done": true,
+      "time": "2026-10-04 17:22:09"
+    },
+    "probe": {
+      "done": true,
+      "time": "2026-10-04 17:22:09",
+      "micro_batch": 16
+    },
+    "smoke": {
+      "done": true,
+      "time": "2026-10-04 17:26:51"
+    },
+    "benchmark": {
+      "done": true,
+      "time": "2026-10-04 17:32:50",
+      "exit_code": 0
+    },
+    "profile": {
+      "done": true,
+      "time": "2026-10-04 17:33:41",
+      "exit_code": 0
+    },
+    "train_A_serial": {
+      "done": true,
+      "time": "2026-10-04 17:45:13",
+      "exit_code": 0
+    },
+    "train_B_parallel": {
+      "done": true,
+      "time": "2026-10-04 17:56:47",
+      "exit_code": 0
+    },
+    "train_C_parallel_fusion_samewidth": {
+      "done": true,
+      "time": "2026-10-04 18:10:19",
+      "exit_code": 0
+    },
+    "train_C_parallel_fusion_matched": {
+      "done": true,
+      "time": "2026-10-04 18:22:54",
+      "exit_code": 0
+    },
+    "report": {
+      "done": true,
+      "time": "2026-10-04 18:23:05"
+    }
+  },
+  "attention_backend": "sdpa_flash",
+  "last_error": "command failed with exit code 4: /usr/bin/python3 scripts/run_smoke.py --models A_serial,B_parallel,C_parallel_fusion_samewidth,C_parallel_fusion_matched --micro-batch 16 --data-dir /content/moe_data --out /content/moe_fusion_runs/pilot --attention-backend sdpa_flash",
+  "micro_batch": 16
+}

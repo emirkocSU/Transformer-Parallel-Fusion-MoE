@@ -1,1725 +1,330 @@
+<div align="center">
 
-**GLM-4.5 / 4.6 / 4.7: seri kullanıyor.** Hugging Face implementasyonundaki decoder katmanı açıkça şu sırada çalışıyor:
+# Parallel Attention ∥ MoE with Periodic FusionMoE
 
-\[
-x
-\rightarrow RMSNorm
-\rightarrow SelfAttention
-\rightarrow +x
-\rightarrow RMSNorm
-\rightarrow MLP/MoE
-\rightarrow +x
-\]
+**A controlled, pre-registered A / B / C architecture experiment on a single A100**
 
-Yani bizim konuştuğumuz klasik:
+*Can we drop the strict Attention → MoE dependency inside each Transformer block, and win back whatever is lost with a
+few periodic "FusionMoE" layers?*
 
-\[
-\boxed{Attention \rightarrow FFN}
-\]
+![status](https://img.shields.io/badge/status-MAIN%20complete%20·%20follow--ups%20planned-2a78d6)
+![hardware](https://img.shields.io/badge/hardware-1×%20A100%2040GB-555)
+![framework](https://img.shields.io/badge/PyTorch-2.11%20·%20BF16-555)
+![tests](https://img.shields.io/badge/tests-58%20passed%20(CPU)-1baf7a)
+![license](https://img.shields.io/badge/license-MIT-555)
 
-yapısı. Kodda önce `self_attn(...)` çağrılıyor, sonucu residual'a ekleniyor; **ondan sonra** `self.mlp(...)` çağrılıyor. Dolayısıyla paralel değiller. [GitHub](https://github.com/huggingface/transformers/blob/main/src/transformers/models/glm4_moe/modeling_glm4_moe.py?utm_source=chatgpt.com)
+[Results](#4-results) · [What we can and cannot claim](#5-interpretation) · [Next steps](#7-next-steps-amendment-5) ·
+[Reproduce](#8-reproduce) · [Slides](docs/presentation/slides.pdf) · [Türkçe özet](docs/BULGULAR_TR.md)
 
-Kimi K2 de aynı açıdan **seri**. Ama burada FFN biraz daha ilginç: Kimi K2 bir **Mixture-of-Experts (MoE)** modeli. Toplam yaklaşık 1 trilyon parametresi var, token başına yaklaşık 32B parametre aktive ediyor; 384 uzmandan 8 tanesi seçiliyor. Attention tarafında ise klasik MHA yerine **MLA (Multi-head Latent Attention)** kullanıyor. [GitHub](https://github.com/MoonshotAI/Kimi-K2?utm_source=chatgpt.com)
+</div>
 
-Kabaca:
+---
 
-\[
-x
-\rightarrow
-\boxed{MLA}
-\rightarrow
-\boxed{MoE}
-\rightarrow
-next\ layer
-\]
+## TL;DR
 
-Yani:
+Four ~160M-active-parameter MoE language models (8 experts, top-2) were trained on the **same 100M FineWeb-Edu tokens,
+same order, same recipe, same GPU**, and compared on the same 15,088 validation sequences with paired statistics.
 
-```text
-Kimi K2
+| | Finding (seed 42, 100M tokens) | Status |
+|---|---|---|
+| **Parallel vs serial** | B (parallel) beats A (serial) by **0.089 nats** with *identical* FLOPs and step time. The gap was 0.23 nats at 4M tokens and shrinks steadily: an early-training speed advantage, not a free lunch. It also appears with a dense FFN, so it is not about MoE routing. | robust (2 seeds, 6 conditions) |
+| **Fusion, extra compute** | C_same (B + 3 FusionMoE layers, +15% FLOPs) beats B by **0.029 nats**; the gain appears only after ~20M tokens and plateaus after ~65M. | inconclusive (below the 0.053-nat single-seed threshold) |
+| **Fusion, same compute** | C_matched (same parameters and FLOPs as B) **ties B** (−0.002). Narrowing the experts costs a constant +0.027; the fusion gain cancels it. | approximately equal |
+| **Efficiency** | Per wall-clock, **B is best**. C_matched is 9% slower for the same quality; C_same needs ~3% more FLOPs (~5% more time) to reach B's final loss. | no evidence fusion is more efficient |
 
-token representation
-       ↓
-      MLA
-   (attention)
-       ↓
-    residual
-       ↓
-      MoE
- (FFN'nin gelişmiş hali)
-       ↓
-    residual
-       ↓
-next Transformer layer
+> **Bottom line so far:** in this regime the parallel block is the better default, and periodic fusion adds a small
+> amount of quality only when it is paid for with extra compute. Whether that extra compute would be better spent on
+> more training tokens is the open question; [Amendment 5](#7-next-steps-amendment-5) tests it next.
+
+---
+
+## Contents
+
+1. [Question](#1-question)
+2. [Architectures](#2-architectures)
+3. [Experimental design](#3-experimental-design)
+4. [Results](#4-results) — [pilot](#41-pilot-25m-tokens) · [diagnostics](#42-diagnostics-why-does-parallel-beat-serial) · [MAIN](#43-main-100m-tokens)
+5. [Interpretation](#5-interpretation)
+6. [Limitations](#6-limitations)
+7. [Next steps (Amendment 5)](#7-next-steps-amendment-5)
+8. [Reproduce](#8-reproduce)
+9. [Repository layout](#9-repository-layout)
+10. [References](#10-references)
+
+---
+
+## 1. Question
+
+Most modern MoE LLMs (DeepSeek-V3, Kimi K2, GLM-4.5) keep the serial block: the MoE feed-forward reads the output of
+the attention in the same layer. GPT-J and PaLM showed the two sublayers can instead run **in parallel** from the same
+input (PaLM: ~15% faster at scale through fused input projections; small quality loss at 8B, none at 62B).
+
+This project asks whether a **parallel MoE block** loses something, and whether a few **FusionMoE** layers — a
+token-wise MoE applied to the residual stream after every 4 parallel blocks — can recover it.
+The original idea and discussion (in Turkish) are kept in [`docs/concept/`](docs/concept/ORIGINAL_CONCEPT_TR.md); the
+full engineering brief is [`docs/concept/EXPERIMENT_PROMPT.md`](docs/concept/EXPERIMENT_PROMPT.md).
+
+## 2. Architectures
+
+```mermaid
+flowchart LR
+  subgraph SA["A · serial (GPT-2 / LLaMA / DeepSeek style)"]
+    direction TB
+    A0["x"] --> A1["Attention(RMSNorm(x))"]
+    A1 --> A2["a = x + attn"]
+    A2 --> A3["MoE(RMSNorm(a))<br/>8 SwiGLU experts, top-2"]
+    A3 --> A4["y = a + moe"]
+  end
+  subgraph SB["B · parallel (GPT-J / PaLM style)"]
+    direction TB
+    B0["x"] --> B1["Attention(RMSNorm(x))"]
+    B0 --> B2["MoE(RMSNorm(x))<br/>8 SwiGLU experts, top-2"]
+    B1 --> B3["y = x + attn + moe"]
+    B2 --> B3
+  end
+  subgraph SC["C · parallel + periodic FusionMoE (this work)"]
+    direction TB
+    C0["parallel blocks 1-4"] --> C1["FusionMoE<br/>x + MoE(RMSNorm(x))"]
+    C1 --> C2["parallel blocks 5-8"] --> C3["FusionMoE"]
+    C3 --> C4["parallel blocks 9-12"] --> C5["FusionMoE"]
+    C5 --> C6["RMSNorm → LM head"]
+  end
 ```
 
-Üstelik Kimi'nin kendi config dosyasında mimari doğrudan `DeepseekV3ForCausalLM` olarak belirtilmiş; Moonshot da deployment dokümanında Kimi K2'nin DeepSeek-V3 CausalLM mimarisini yeniden kullandığını açıkça söylüyor. [Hugging Face](https://huggingface.co/moonshotai/Kimi-K2-Base/blob/main/config.json?utm_source=chatgpt.com)
+Shared by all models: 12 layers, d_model 768, 12 × 64 heads, RoPE, RMSNorm, 8 SwiGLU experts with top-2 routing and no
+token dropping, tied embeddings, 32k BPE vocabulary, context 1024. A and B have **bit-identical initial weights**.
 
-Buradaki önemli nokta şu:
+| model | MoE layers | expert hidden | total params | active params / token | train FLOPs / token |
+|---|---|---|---|---|---|
+| **A** serial | 12 | 1920 | 477.65M | 159.15M | 1.068 G |
+| **B** parallel | 12 | 1920 | 477.65M | 159.15M | 1.068 G |
+| **C_same** parallel + fusion | 12 + 3 | 1920 | 583.84M | 185.71M | 1.227 G (+15%) |
+| **C_matched** parallel + fusion | 12 + 3 | 1536 | 477.67M | 159.17M | 1.068 G |
 
-**MoE, FFN'nin yerine geçen bambaşka bir attention mekanizması değil.**
+`C_same` asks *does adding fusion help?* (extra compute). `C_matched` asks *is fusion a better use of the same budget?*:
+its experts are narrowed so that 15 × 1536 = 12 × 1920 (expert parameters and active FLOPs match B to 0.000%).
 
-Normal Transformer:
+## 3. Experimental design
 
-\[
-Attention
-\rightarrow
-\boxed{FFN}
-\]
+Everything that is not the architecture is held fixed and **audited automatically** after every run (17 checks: train
+config, steps, tokens, micro-batch, evaluation steps, validation set, GPU model, attention/MoE/parallel backends, code
+fingerprint, dataset hashes). Details: [`METHODOLOGY.md`](moe_fusion_experiment/METHODOLOGY.md).
 
-Kimi gibi MoE Transformer:
+| | |
+|---|---|
+| Data | FineWeb-Edu `sample-10BT`, pinned revision, first 300k documents, document-level train/validation split; rebuilt byte-identically after a runtime reset |
+| Recipe | AdamW (0.9, 0.95, wd 0.1), peak LR 3e-4, 2% warm-up, cosine to 10%, clip 1.0, global batch 64 × 1024 tokens, BF16 autocast with FP32 master weights / router / loss |
+| MoE | Switch load-balancing loss 0.01 per router (summed), z-loss logged only, no capacity limit |
+| Evaluation | paired per-sequence differences on the full validation set (15.45M tokens), normal and bootstrap 95% CIs, fraction of sequences that improve |
+| Pre-registration | hypotheses and decision rules written **before** each phase; every change is a dated amendment in [`EXPERIMENT_SPEC.md`](moe_fusion_experiment/EXPERIMENT_SPEC.md) |
 
-\[
-Attention
-\rightarrow
-\boxed{MoE\ FFN}
-\]
+| phase | tokens / model | runs | question | amendment |
+|---|---|---|---|---|
+| Pilot | 25.2M | A, B, C_same, C_matched | catch bugs, first comparison | 1 (balance loss summed per router, as in Switch) |
+| Diagnostics | 25.2M | A vs B × 4 conditions | is the surprising B > A gap real, and why? | 3 (rules R1-R4) |
+| MAIN | 100.0M | A, B, C_same, C_matched | the fusion verdict | 2 (protocol), 4 (single-seed threshold) |
+| Follow-ups | — | planned | is fusion a better use of compute than more tokens? | 5 (plan) |
 
-Normal FFN'de her token aynı büyük FFN'den geçerken:
+## 4. Results
 
-\[
-x\rightarrow FFN(x)
-\]
+All numbers below are read from the logs in [`results/`](results/); every report there is machine-generated.
 
-MoE'de router diyor ki:
+### 4.1 Pilot (25M tokens)
 
-> “Bu token için hangi uzman FFN'ler daha uygun?”
+| | A | B | C_same | C_matched |
+|---|---|---|---|---|
+| final validation loss | 5.4918 | **5.3129** | 5.3175 | 5.3715 |
+| training minutes | 8.2 | 8.1 | 9.5 | 8.9 |
 
-Örneğin:
+B beat A by 0.179 nats, which contradicts the expectation that the serial block is at least as good. C_same tied B
+(+0.005) and C_matched was worse (+0.059). Before spending 100M tokens, the B > A gap was put under test.
+Report: [`results/pilot/FINAL_REPORT.md`](results/pilot/FINAL_REPORT.md).
 
-```text
-"The Python function throws an exception"
+### 4.2 Diagnostics: why does parallel beat serial?
 
-              ↓
-            Router
-          ↙   ↓   ↘
-     Expert 7
-     Expert 42
-     Expert 106
-     ...
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/figures/b_minus_a_summary_dark.png">
+  <img alt="B minus A validation loss in every condition: pilot -0.179, diag seed 42 -0.172, seed 43 -0.119, dense control -0.136, 10% warm-up -0.197, MAIN 100M -0.089" src="docs/figures/b_minus_a_summary.png">
+</picture>
 
-ve 384 uzmanın yalnızca 8'i çalışıyor.
+| rule (pre-registered) | measurement | verdict |
+|---|---|---|
+| **R1** real or seed noise? | seed 42: −0.172, seed 43: −0.119 | **robust** |
+| **R2** MoE-specific? | dense FFN control: −0.136 | **not MoE-specific** |
+| **R3** short warm-up artefact? | 10% warm-up: −0.197 (both models improve, gap widens) | **not a warm-up artefact** |
+| **R4** routing instability? | serial routing churn 1.24× / 1.19× parallel in the first quarter | weak (below 1.5×) |
 
-Bu da çok ilginç biçimde **senin biraz önce sorduğun verimlilik problemine başka bir çözüm** getiriyor:
+**Conclusion:** the advantage is a property of this training regime (small, heavily under-trained model, one shared
+recipe), not of MoE routing. The diagnostics also measured the seed-to-seed variation of an architecture difference,
+**0.053 nats**, which became the single-seed decision threshold for MAIN (Amendment 4).
+In the dense control the MoE did not yet beat a dense FFN of equal active compute at 25M tokens (B: 5.3298 MoE vs
+5.3305 dense), as expected this early in training. Report: [`results/diagnostics/DIAG_REPORT.md`](results/diagnostics/DIAG_REPORT.md).
 
-Sen:
+### 4.3 MAIN (100M tokens)
 
-> “Attention ile FFN'yi paralel yapıp zaman kazanamaz mıyız?”
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/figures/main_loss_vs_tokens_dark.png">
+  <img alt="Validation loss vs training tokens for the four models; final A 4.154, B 4.066, C_matched 4.063, C_same 4.037 on the periodic subset" src="docs/figures/main_loss_vs_tokens.png">
+</picture>
 
-dedin.
+| model | final validation loss | perplexity | training wall-clock | tokens / s | peak memory |
+|---|---|---|---|---|---|
+| A serial | 4.1564 | 63.84 | 32.3 min | 51,562 | 29.9 GB |
+| B parallel | 4.0672 | 58.40 | 32.3 min | 51,570 | 29.3 GB |
+| C_same | **4.0379** | **56.71** | 37.7 min | 44,228 | 33.8 GB |
+| C_matched | 4.0651 | 58.27 | 35.2 min | 47,326 | 30.4 GB |
 
-PaLM'in yaklaşımı kabaca:
+Paired differences (same 15,088 validation sequences; negative = first model better):
 
-\[
-Attention(x)\parallel FFN(x)
-\]
-
-Kimi/DeepSeek/GLM tarafının büyük optimizasyonlarından biri ise farklı:
-
-\[
-Attention(x)
-\rightarrow
-\underbrace{yalnızca\ gerekli\ FFN\ uzmanlarını\ çalıştır}_{MoE}
-\]
-
-Yani FFN'yi tamamen paralelleştirmek yerine **FFN'nin tamamını her token için çalıştırmıyorlar.**
-
-### Bugünkü birkaç açık modelin resmi
-
-| Model | Attention | FFN tarafı | Attention–FFN |
+| comparison | ΔL [95% CI] | sequences improved | pre-registered verdict |
 |---|---|---|---|
-| **GLM-4.5/4.6/4.7** | GQA-tarzı attention | MoE | **Seri** |
-| **Kimi K2** | MLA | MoE, 384 expert / 8 seçili | **Seri** |
-| **DeepSeek-V3** | MLA | MoE | **Seri** |
-| PaLM | Multi-head attention | Dense FFN | **Paralel** |
-
-Yani ilginç sonuç şu:
-
-\[
-\boxed{\text{Modern model} \neq \text{mutlaka Attention ∥ FFN}}
-\]
-
-Hatta **Kimi K2, DeepSeek-V3 ve GLM gibi çok güçlü modern açık modeller hâlâ Attention → FFN/MoE bağımlılığını koruyor.**
-
-Çünkü senin önceki sorunda fark ettiğimiz avantajdan vazgeçmek istemiyorlar:
-
-\[
-Attention(x)=\text{bağlamdan yeni bilgi getir}
-\]
-
-sonra
-
-\[
-MoE(Attention(x))=\textbf{o yeni bilgiyi hemen işle}
-\]
-
-Paralel yaparsak ikinci adım aynı katmandaki yeni attention bilgisini göremeyecekti.
-
-Bence buradan sonra **Kimi K2'nin tek bir Transformer katmanını açıp**, `input → MLA → residual → MoE router → 8 expert → residual` şeklinde sayılarla takip etmek çok öğretici olur. O zaman klasik Transformer'dan bugünkü LLM'lere neyin değiştiğini bayağı net görürüz.
-
-
-Bu fusion mau ffm daha önce denenmiş mi
-Evet, çok yakın fikirler denenmiş, ama yaptığımız hızlı literatür taramasına göre senin tarif ettiğin kombinasyonun aynısını — her blokta parallel Attention + MoE, sonra belirli aralıklarla ekstra “fusion MoE-FFN” — standartlaşmış, bilinen bir LLM mimarisi olarak görmedim.
-
-En yakın çalışmalar üç ayrı parçayı deniyor:
-
-PaLM / GPT-J yaklaşımı: Attention ve MLP aynı girdiden paralel çalışıyor:
-
-x
-′
-=
-x
-+
-A
-t
-t
-e
-n
-t
-i
-o
-n
-(
-L
-N
-(
-x
-)
-)
-+
-M
-L
-P
-(
-L
-N
-(
-x
-)
-)
-x 
-′
- =x+Attention(LN(x))+MLP(LN(x))
-PaLM bunun büyük ölçekte yaklaşık %15 eğitim hızlanması sağladığını ve 62B deneyinde belirgin kalite kaybı görmediklerini bildiriyor. 
-
-Sandwich Transformer (Press et al., ACL 2020): Araştırmacılar Attention → FFN → Attention → FFN sırasının kutsal olmadığını test etmişler. Attention'ları daha erken, FFN'leri daha geç kümelendiren mimarilerin bazı language-modeling benchmarklarında daha iyi perplexity verdiğini göstermişler. 
-
-Macaron/Conformer tipi yapılar: Bir attention'ın etrafına ekstra FFN koyma fikri de mevcut:
-
-1
-2
-F
-F
-N
-→
-A
-t
-t
-e
-n
-t
-i
-o
-n
-→
-1
-2
-F
-F
-N
-2
-1
-​
- FFN→Attention→ 
-2
-1
-​
- FFN
-Yani “attention ile FFN etkileşimini ek FFN kullanarak güçlendirme” fikrinin de öncülleri var. 
-
-Ama senin önerin bunların biraz farklı bir birleşimi:
-
-P
-=
-A
-t
-t
-e
-n
-t
-i
-o
-n
-(
-x
-)
-+
-M
-o
-E
-(
-x
-)
-P=Attention(x)+MoE(x)
-​
- 
-bunu birkaç layer tekrarla:
-
-P
-1
-→
-P
-2
-→
-P
-3
-→
-P
-4
-P 
-1
-​
- →P 
-2
-​
- →P 
-3
-​
- →P 
-4
-​
- 
-sonra:
-
-F
-u
-s
-i
-o
-n
-M
-o
-E
-(
-P
-4
-)
-FusionMoE(P 
-4
-​
- )
-​
- 
-sonra tekrar:
-
-P
-5
-→
-P
-6
-→
-P
-7
-→
-P
-8
-→
-F
-u
-s
-i
-o
-n
-M
-o
-E
-P 
-5
-​
- →P 
-6
-​
- →P 
-7
-​
- →P 
-8
-​
- →FusionMoE
-Yani örneğin:
-
-Parallel block
-      ↓
-Parallel block
-      ↓
-Parallel block
-      ↓
-Parallel block
-      ↓
-★ Fusion MoE
-      ↓
-Parallel block
-      ↓
-...
-Bu, Sandwich Transformer'dan da farklı. Sandwich sublayer sıralamasını değiştiriyor; bizim hipotezimiz ise parallel block'un kaybettiği aynı-katman Attention→FFN etkileşimini periyodik olarak geri kazandırmaya çalışıyor.
-
-Ve bence burada test edilmesi gereken asıl hipotez şu:
-
-Her layer’da serial fusion ger
-c
-¸
-ekten gerekli mi?
-Her layer’da serial fusion ger 
-c
-¸
-​
- ekten gerekli mi?
-​
- 
-Belki değildir.
-
-Belki:
-
-A
-t
-t
-e
-n
-t
-i
-o
-n
-∥
-M
-o
-E
-Attention∥MoE
-4 kez yapıp
-
-F
-u
-s
-i
-o
-n
-M
-o
-E
-FusionMoE
-bir kez yapmak yeterlidir.
-
-Eğer öyleyse çok ilginç bir sonuç çıkar: klasik modelin her katmanda ödediği
-
-A
-t
-t
-e
-n
-t
-i
-o
-n
-→
-F
-F
-N
-Attention→FFN
-dependency maliyetinin bir kısmını kaldırıp, seyrek fusion noktalarıyla kaliteyi geri kazanabiliriz.
-
-Ama bir düzeltme yapayım: buna şimdiden “yeni mimari bulduk” diyemeyiz. Transformer sublayer reordering, parallel blocks, sandwich/Macaron yapıları ve çeşitli fusion yapıları oldukça geniş literatür. Tam kombinasyon için daha sistematik paper/code search yapmak gerekir.
-
-Deneyi yapacaksak bence yalnız iki değil üç model kesin olmalı:
-
-A
-:
- 
-S
-e
-r
-i
-a
-l
- 
-A
-t
-t
-e
-n
-t
-i
-o
-n
-→
-M
-o
-E
-A: Serial Attention→MoE
-​
- 
-B
-:
- 
-P
-a
-r
-a
-l
-l
-e
-l
- 
-A
-t
-t
-e
-n
-t
-i
-o
-n
-∥
-M
-o
-E
-B: Parallel Attention∥MoE
-​
- 
-C
-:
- 
-P
-a
-r
-a
-l
-l
-e
-l
- 
-A
-t
-t
-e
-n
-t
-i
-o
-n
-∥
-M
-o
-E
-+
-p
-e
-r
-i
-o
-d
-i
-c
- 
-F
-u
-s
-i
-o
-n
-M
-o
-E
-C: Parallel Attention∥MoE+periodic FusionMoE
-​
- 
-Çünkü B olmadan C'nin gerçekten fusion sayesinde iyileştiğini kanıtlayamayız. Bu üçlü deney fikrimizi çok daha bilimsel test eder.
-
-Tamam senin fikrin ne peki sence başarı sağlayacak mı kısaca cevapla
-Bence başarı şansı var, özellikle hız/kalite oranında.
-
-Tahminim:
-
-Saf paralel → hızlanır ama bir miktar kalite kaybeder.
-Paralel + periyodik Fusion MoE → bu kaybın önemli bölümünü geri kazanabilir.
-En olası kazanç, seri modelden daha yüksek kalite değil, benzer kaliteyi daha kısa sürede / daha az latency ile elde etmek.
-En kritik soru da fusion sıklığı: bence her 3–4 paralel blokta bir fusion ilk denenmesi gereken yer. Eğer burada perplexity baseline'a yaklaşırken tokens/sec anlamlı yükselirse, fikir gerçekten işe yarıyor demektir.
-
-Tamam o zaman bu test için lazım olan şeyler nedir önce bunu çıkartalım detaylı bir araştırma yap genel bir çerçeve oluşturacağız, ayrıca colab üyeliğim var A100 Gpu içerisinde çalıştırabiliriz: olmalı:
-
-\boxed{A:\ Serial\ Attention\rightarrow MoE}
-
-\boxed{B:\ Parallel\ Attention\parallel MoE}
-
-\boxed{C:\ Parallel\ Attention\parallel MoE + periodic\ FusionMoE}
-
-Çünkü B olmadan C’nin gerçekten fusion
-Evet. B kesinlikle gerekli; yoksa C iyi çıkarsa bunun “fusion”dan mı yoksa sadece paralel mimariden mi geldiğini ayıramayız.
-
-Literatüre bakınca deneyin temeli de sağlam: paralel Attention–MLP yaklaşımının GPT-J/PaLM çizgisinde precedenti var; sublayer sırasının değiştirilebildiğini Sandwich Transformer göstermiş; MoE tarafında Switch, OLMoE, DeepSeekMoE ve Mixtral bize router/uzman tasarımı için iyi referanslar veriyor. 
-
-Deneyin ana sorusu
-Aslında tek bir hipotezi test ediyoruz:
-
-Her Transformer bloğunda Attention → MoE bağımlılığına gerçekten ihtiyacımız var mı, yoksa çoğu bloğu paralel çalıştırıp belirli aralıklarla fusion yapmak yeterli mi?
-
-Üç model:
-
-A
-:
- 
-S
-e
-r
-i
-a
-l
-A: Serial
-​
- 
-x
-l
-→
-A
-t
-t
-e
-n
-t
-i
-o
-n
-→
-M
-o
-E
-→
-x
-l
-+
-1
-x 
-l
-​
- →Attention→MoE→x 
-l+1
-​
- 
-B
-:
- 
-P
-u
-r
-e
- 
-P
-a
-r
-a
-l
-l
-e
-l
-B: Pure Parallel
-​
- 
-A
-t
-t
-e
-n
-t
-i
-o
-n
-(
-x
-l
-)
-∥
-M
-o
-E
-(
-x
-l
-)
-Attention(x 
-l
-​
- )∥MoE(x 
-l
-​
- )
-x
-l
-+
-1
-=
-x
-l
-+
-A
-t
-t
-n
-(
-x
-l
-)
-+
-M
-o
-E
-(
-x
-l
-)
-x 
-l+1
-​
- =x 
-l
-​
- +Attn(x 
-l
-​
- )+MoE(x 
-l
-​
- )
-ve bizim esas deneyimiz:
-
-C
-:
- 
-P
-a
-r
-a
-l
-l
-e
-l
-+
-P
-e
-r
-i
-o
-d
-i
-c
- 
-F
-u
-s
-i
-o
-n
-C: Parallel+Periodic Fusion
-​
- 
-örneğin:
-
-Parallel
-   ↓
-Parallel
-   ↓
-Parallel
-   ↓
-Parallel
-   ↓
-FUSION MoE
-   ↓
-Parallel
-   ↓
-Parallel
-   ↓
-Parallel
-   ↓
-Parallel
-   ↓
-FUSION MoE
-Burada ilk deneyde fusion interval = 4 seçmek mantıklı. Sonra gerekirse 2/4/8 ablation yaparız.
-
-1. Model boyutu
-A100 olduğu için aşırı küçük 10M model kullanmak istemiyorum. O ölçekte elde ettiğimiz sonuç büyük LLM mimarisi hakkında zayıf kanıt olur.
-
-Ama ilk deneyde 1B de gereksiz pahalı.
-
-Ben ~100–200M active parameter civarında başlamayı tercih ederim.
-
-Örneğin başlangıç noktası:
-
-Özellik	İlk deney
-Layers	12
-d
-m
-o
-d
-e
-l
-d 
-model
-​
- 	768
-Attention heads	12
-Head dimension	64
-Context	1024
-Experts	8
-Active experts	Top-2
-Expert FFN	SwiGLU
-Normalization	RMSNorm
-Position	RoPE
-Precision	BF16
-Bu modern LLM'lere yeterince benzeyen ama A100 üzerinde tekrar tekrar eğitebileceğimiz bir model verir.
-
-Mixtral'ın her token için router ile iki uzman seçmesi de Top-2 MoE için iyi bir referans. 
-
-2. En kritik mesele: adil karşılaştırma
-Burada kolayca yanlış deney yapabiliriz.
-
-C'ye ekstra Fusion MoE eklersek:
-
-P
-a
-r
-a
-m
-e
-t
-e
-r
-s
-C
->
-P
-a
-r
-a
-m
-e
-t
-e
-r
-s
-A
-Parameters 
-C
-​
- >Parameters 
-A
-​
- 
-olabilir.
-
-Sonra C daha iyi çıkarsa:
-
-“Mimari daha iyi.”
-
-diyemeyiz.
-
-Belki sadece daha fazla parametresi vardır.
-
-Bu yüzden iki ayrı karşılaştırma yapmamız lazım.
-
-Quality-controlled test: A/B/C mümkün olduğunca aynı active parameter/FLOPs bütçesinde.
-
-System-efficiency test: Gerçek mimarileri olduğu gibi çalıştırıp:
-
-t
-o
-k
-e
-n
-s
-/
-s
-e
-c
-tokens/sec
-w
-a
-l
-l
-−
-c
-l
-o
-c
-k
-wall−clock
-V
-R
-A
-M
-VRAM
-ölçmek.
-
-Bence ikisini birbirinden ayırmamız çok önemli.
-
-3. MoE'yi basit tutacağız
-İlk deneyde DeepSeek-V3 seviyesinde karmaşık router tasarlamak istemiyorum.
-
-Basit:
-
-R
-o
-u
-t
-e
-r
-(
-x
-)
-=
-s
-o
-f
-t
-m
-a
-x
-(
-W
-r
-x
-)
-Router(x)=softmax(W 
-r
-​
- x)
-sonra:
-
-T
-o
-p
-K
-(
-R
-o
-u
-t
-e
-r
-(
-x
-)
-,
-2
-)
-TopK(Router(x),2)
-ve token iki experte gönderilir.
-
-8 expert:
-
-             Router
-          ↙    ↓    ↘
-       E1 E2 E3 ... E8
-
-       Top-2 seç
-MoE eğitiminde routing dengesizliği ve training instability gerçek sorunlar; Switch Transformer bunu özellikle ele alıyor. MegaBlocks da GPU üzerinde dinamik MoE routing'in sistem maliyetinin ciddi olabileceğini gösteriyor. 
-
-Bu yüzden en azından:
-
-L
-=
-L
-L
-M
-+
-λ
-L
-b
-a
-l
-a
-n
-c
-e
-L=L 
-LM
-​
- +λL 
-balance
-​
- 
-kullanmalıyız.
-
-Ve şunları loglamalıyız:
-
-expert utilization, router entropy, expert başına token sayısı ve load-balancing loss.
-
-Yoksa örneğin 8 expert koyup modelin sürekli 2 tanesini kullandığını fark etmeyebiliriz.
-
-4. Dataset
-İlk ciddi test için benim tercihim FineWeb-Edu'dan sabit bir subset olur.
-
-FineWeb-Edu eğitim amaçlı yüksek kaliteli web metinlerinden oluşturulmuş ve model ablation çalışmaları için de kullanılmış açık bir corpus. 
-
-Ama üç modele tam olarak aynı tokenlar ve aynı sırayla verilmesi şart.
-
-Örneğin ilk aşama:
-
-100
-M
-−
-300
-M
- 
-t
-r
-a
-i
-n
-i
-n
-g
- 
-t
-o
-k
-e
-n
-s
-100M−300M training tokens
-yeterli olabilir.
-
-Bu deney “iyi bir chatbot üretme” deneyi değil.
-
-Amacımız:
-
-a
-r
-c
-h
-i
-t
-e
-c
-t
-u
-r
-e
-A
-v
-s
-a
-r
-c
-h
-i
-t
-e
-c
-t
-u
-r
-e
-B
-v
-s
-a
-r
-c
-h
-i
-t
-e
-c
-t
-u
-r
-e
-C
-architecture 
-A
-​
- vsarchitecture 
-B
-​
- vsarchitecture 
-C
-​
- 
-karşılaştırması.
-
-Chinchilla çalışmasının temel sonucu da model büyüklüğü ile eğitim token miktarının birlikte değerlendirilmesi gerektiğini gösteriyor; bu yüzden token bütçesini baştan sabitlemek önemli. 
-
-5. Tokenizer
-Tokenizer'ı üç model için yeniden eğitmeyeceğiz.
-
-Tek tokenizer:
-
-V
-o
-c
-a
-b
-u
-l
-a
-r
-y
-≈
-32
-K
-Vocabulary≈32K
-ve:
-
-Dataset
-   ↓
-same tokenizer
-   ↓
-same token IDs
-   ↓
-A / B / C
-Böylece tokenizer bir confounder olmaz.
-
-6. Training koşulları tamamen aynı olacak
-A/B/C için:
-
-same dataset
-same tokenizer
-same train/validation split
-same random seed
-same batch size
-same optimizer
-same learning-rate schedule
-same warmup
-same context length
-same token budget
-same precision
-Optimizer başlangıç için AdamW olabilir.
-
-A100'de:
-
-B
-F
-16
-BF16
-kullanırız.
-
-Attention tarafında da mümkünse FlashAttention-2 kullanırız. A100 üzerinde FA2, attention hesaplamasını ciddi biçimde optimize ediyor; makalede GPT tarzı modellerde A100 başına 225 TFLOPs/s'ye kadar rapor edilmiş. 
-
-Ama A/B/C'nin üçünde de aynı attention kernel'i kullanılacak.
-
-7. Asıl ölçmemiz gereken şey
-Burada sadece:
-
-Validation loss hangisinde düşük?
-
-diye bakmak yeterli değil.
-
-Bizim hipotezimiz:
-
-quality per unit compute/time
-quality per unit compute/time
-​
- 
-Bu yüzden dört ana grafik istiyorum.
-
-Validation loss vs tokens
-Bu bize mimarinin öğrenme verimliliğini gösterir.
-
-x
-=
-t
-r
-a
-i
-n
-i
-n
-g
- 
-t
-o
-k
-e
-n
-s
-x=training tokens
-y
-=
-v
-a
-l
-i
-d
-a
-t
-i
-o
-n
- 
-l
-o
-s
-s
-y=validation loss
-Validation loss vs wall-clock
-Bence en önemli grafik bu.
-
-x
-=
-m
-i
-n
-u
-t
-e
-s
-x=minutes
-y
-=
-v
-a
-l
-i
-d
-a
-t
-i
-o
-n
- 
-l
-o
-s
-s
-y=validation loss
-Örneğin:
-
-        loss
-         │
- A       │\
-         │ \
- B       │  \
-         │   \ C
-         │     \
-         └──────────── time
-C aynı loss'a daha erken ulaşıyorsa fikrimiz işe yarıyor.
-
-Tokens/sec
-Direkt:
-
-T
-h
-r
-o
-u
-g
-h
-p
-u
-t
-=
-t
-o
-k
-e
-n
-s
-s
-e
-c
-o
-n
-d
-Throughput= 
-second
-tokens
-​
- 
-A vs B vs C.
-
-GPU utilization / VRAM
-A100'ün gerçekten paralellikten yararlanıp yararlanmadığını görmek istiyoruz.
-
-Çünkü teorik:
-
-A
-t
-t
-e
-n
-t
-i
-o
-n
-∥
-M
-o
-E
-Attention∥MoE
-yazmamız GPU'nun bunu otomatik olarak aynı anda kusursuz çalıştıracağı anlamına gelmiyor.
-
-Bu çok önemli.
-
-8. Gerçek paralellik meselesi
-Burada deneyin en teknik ve en kritik kısmı var.
-
-PyTorch'ta şunu yazmamız:
-
-attn = attention(x)
-moe = moe(x)
-
-bunları gerçekten paralel çalıştırmaz.
-
-Python satırları sırayla dispatch edilir.
-
-B modelinin iddiasını gerçek anlamda test etmek istiyorsak ilerleyen aşamada CUDA stream/fused-kernel veya uygun kernel-level execution düşünmemiz gerekiyor.
-
-PaLM tipi parallel layers'ın hız avantajının bir bölümü de matrix multiplication işlemlerinin birlikte/fused yapılabilmesinden geliyor. 
-
-Bu nedenle deneyi iki seviyeye ayıracağım:
-
-Architecture experiment
-
-Parallel formulation kaliteyi koruyor mu?
-
-ve ayrı olarak:
-
-Systems experiment
-
-A100 üzerinde bunu gerçekten daha hızlı çalıştırabiliyor muyuz?
-
-Bunları birbirine karıştırmamalıyız.
-
-9. C için fusion tasarımı
-İlk versiyonda aşırı karmaşık bir şey yapmayalım.
-
-Dört parallel block:
-
-P
-1
-,
-P
-2
-,
-P
-3
-,
-P
-4
-P 
-1
-​
- ,P 
-2
-​
- ,P 
-3
-​
- ,P 
-4
-​
- 
-ardından:
-
-F
-1
-=
-x
-+
-M
-o
-E
-(
-R
-M
-S
-N
-o
-r
-m
-(
-x
-)
-)
-F 
-1
-​
- =x+MoE(RMSNorm(x))
-Sonra tekrar:
-
-P
-5
-.
-.
-.
-P
-8
-P 
-5
-​
- ...P 
-8
-​
- 
-ve:
-
-F
-2
-F 
-2
-​
- 
-Yani 12-layer örneğinde:
-
-Embedding
-    │
-   P1
-    │
-   P2
-    │
-   P3
-    │
-   P4
-    │
- ★ Fusion MoE
-    │
-   P5
-    │
-   P6
-    │
-   P7
-    │
-   P8
-    │
- ★ Fusion MoE
-    │
-   P9
-    │
-  P10
-    │
-  P11
-    │
-  P12
-    │
- ★ Final Fusion MoE
-    │
- LM Head
-Burada final fusion özellikle mantıklı; Sandwich Transformer'ın başarılı varyantlarında daha fazla FFN'nin üst katmanlara doğru bulunmasının faydalı olabildiğine dair sonuç da hipotezimizle ilginç biçimde uyumlu. Ama çalışma bunun her görevde garanti olmadığını da gösteriyor. 
-
-10. İlk deneyden sonra gerçek ablation
-Eğer C umut verirse ikinci deney:
-
-C
-2
-:
- 
-f
-u
-s
-i
-o
-n
- 
-e
-v
-e
-r
-y
- 
-2
-C 
-2
-​
- : fusion every 2
-C
-4
-:
- 
-f
-u
-s
-i
-o
-n
- 
-e
-v
-e
-r
-y
- 
-4
-C 
-4
-​
- : fusion every 4
-C
-8
-:
- 
-f
-u
-s
-i
-o
-n
- 
-e
-v
-e
-r
-y
- 
-8
-C 
-8
-​
- : fusion every 8
-C
-f
-i
-n
-a
-l
-:
- 
-o
-n
-l
-y
- 
-f
-i
-n
-a
-l
- 
-f
-u
-s
-i
-o
-n
-C 
-final
-​
- : only final fusion
-olmalı.
-
-O zaman çok güzel bir eğri elde ederiz:
-
-f
-u
-s
-i
-o
-n
- 
-f
-r
-e
-q
-u
-e
-n
-c
-y
-↔
-q
-u
-a
-l
-i
-t
-y
-↔
-s
-p
-e
-e
-d
-fusion frequency↔quality↔speed
-Ve belki optimum:
-
-F
-u
-s
-i
-o
-n
- 
-e
-v
-e
-r
-y
- 
-4
-Fusion every 4
-​
- 
-değil, 6 veya 8 çıkar. Bunu önceden varsaymamalıyız.
-
-Başarı kriterimiz
-Deneyden önce başarıyı tanımlayalım ki sonuca bakıp kriter değiştirmeyelim.
-
-Ben ana kriteri şöyle koyardım:
-
-C
-,
- 
-A
-′
-n
-ı
-n
-v
-a
-l
-i
-d
-a
-t
-i
-o
-n
- 
-l
-o
-s
-s
-′
-u
-n
-a
-d
-a
-h
-a
- 
-k
-ı
-s
-a
- 
-w
-a
-l
-l
-−
-c
-l
-o
-c
-k
- 
-s
-u
-¨
-r
-e
-d
-e
- 
-u
-l
-a
-s
-\c
-a
-b
-i
-l
-i
-y
-o
-r
- 
-m
-u
-?
-C, A 
-′
- nınvalidation loss 
-′
- unadaha kısa wall−clock s 
-u
-¨
- rede ula 
-s
-\c
-​
- abiliyor mu?
-​
- 
-İkinci kriter:
-
-P
-P
-L
-C
-≈
-P
-P
-L
-A
-ve
-t
-h
-r
-o
-u
-g
-h
-p
-u
-t
-C
->
-t
-h
-r
-o
-u
-g
-h
-p
-u
-t
-A
-PPL 
-C
-​
- ≈PPL 
-A
-​
- vethroughput 
-C
-​
- >throughput 
-A
-​
- 
-​
- 
-B ise bize mekanizmayı anlatacak:
-
-B hızlı + kötü, C hızlı + iyi: → fusion gerçekten işe yarıyor.
-B ≈ C: → fusion gereksiz.
-A > B,C: → serial dependency önemli.
-C > A aynı compute'ta: → çok ilginç; mimari yalnız hız değil öğrenme açısından da avantaj sağlıyor olabilir.
-Dolayısıyla deneyin bilimsel omurgası gerçekten:
-
-A
-v
-s
-B
-v
-s
-C
-AvsBvsC
-​
- 
-olmalı.
-
-Ve A100'ün olması güzel; bu artık “oyuncak fikir çalışıyor mu?” testinden ziyade küçük ölçekli gerçek bir architecture ablation yapmamıza izin veriyor.
-
-Bir sonraki aşamada kodlamadan önce tam deney spesifikasyonunu dondurmak en doğrusu: modelin kesin parametre sayısı, 8 expert'in boyutları, Top-2 routing, fusion katmanlarının parametre bütçesinin A ile nasıl eşitleneceği, token sayısı ve A100'de tahmini çalışma süresi. En hassas kısım özellikle C'ye ekstra Fusion MoE eklerken A/B/C'nin compute bütçesini nasıl adil tutacağımız olacak.
+| B − A | −0.0891 [−0.0899, −0.0883] | 99.6% | **better** |
+| C_same − B | −0.0293 [−0.0297, −0.0290] | 92.2% | **inconclusive** (0.02 ≤ abs ΔL < 0.053) |
+| C_matched − B | −0.0021 [−0.0025, −0.0018] | 54.3% | **approximately equal** |
+| C_matched − C_same | +0.0272 [+0.0268, +0.0276] | 10.6% | inconclusive |
+
+**The gaps over training** — the most informative view, because it shows *when* each effect appears:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/figures/main_gaps_dark.png">
+  <img alt="Four panels of paired loss differences vs tokens: B-A shrinks from -0.23 to -0.089; C_same-B is zero until 20M tokens then reaches -0.029; C_matched-C_same is a constant +0.027; C_matched-B falls from +0.044 to -0.002" src="docs/figures/main_gaps.png">
+</picture>
+
+* **B − A** shrinks from −0.23 (4M tokens) to −0.089; B reaches A's final loss after 77% of the tokens.
+* **C_same − B** is zero for the first ~20M tokens, then opens and settles near −0.028 after ~65M. The 25M-token pilot
+  stopped just before this happened.
+* **C_matched − C_same** is flat at ≈ +0.027 from the start: the price of narrowing all 12 main MoE layers by 20%.
+* **C_matched − B** is the sum of the two, and crosses zero at ~67M tokens: the fusion gain exactly pays for the
+  narrowing.
+
+**Wall-clock efficiency:**
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/figures/main_loss_vs_wallclock_dark.png">
+  <img alt="Validation loss vs training wall-clock: B finishes first with the lowest loss at 32.3 minutes; C_matched finishes at 35.2 and C_same at 37.7 minutes" src="docs/figures/main_loss_vs_wallclock.png">
+</picture>
+
+| at B's finishing time (32.3 min) | A 4.1541 | **B 4.0656** | C_same 4.0821 | C_matched 4.0857 |
+|---|---|---|---|---|
+
+| to reach B's final loss | tokens | training time | FLOPs vs B |
+|---|---|---|---|
+| B | 100.0M | 32.3 min | 1.00× |
+| C_same | 90.0M | 33.9 min | ≈ 1.03× |
+| C_matched | 99.0M | 34.9 min | ≈ 0.99× (but 8% slower per FLOP) |
+
+**Pre-registered fusion verdict: INCONCLUSIVE.** Replicate B and the C variants before concluding.
+Full report: [`results/main/FINAL_REPORT.md`](results/main/FINAL_REPORT.md).
+
+## 5. Interpretation
+
+**Why do A and B take the same time, if B is "parallel"?**
+They do exactly the same work: identical parameters, FLOPs and median step time (1269.3 ms). The parallel block only
+changes *what the MoE reads* (x instead of x + attention). Speed-ups from a parallel block come from fusing the
+attention and MLP input matrix multiplications (PaLM) or from executing the two branches concurrently. Concurrent CUDA
+streams were measured in the pilot and gave ≤ 1%: at this size each kernel already fills the A100. With MoE the FFN
+input goes through a router and per-expert weights, so the PaLM-style fused projection does not carry over directly.
+
+**Why is the serial model worse?** Not because it computes less. The parallel model learns faster early (shorter
+effective depth of the residual path is one plausible reason; routing instability is not the main one, since the dense
+control shows the same gap). The serial model is catching up (−0.23 → −0.089). This agrees with GPT-J/NeoX and PaLM,
+where the difference vanishes at scale; we cannot say from these runs when it would close.
+
+**Is fusion useful?**
+* *Quality:* there is a consistent but small and unreplicated signal: +15% compute buys 0.029 nats, improving 92% of
+  sequences, appearing only after ~20M tokens.
+* *At equal compute:* no. Spending the budget on 3 fusion layers instead of wider experts gives the same loss (−0.002)
+  and is 9% slower in this implementation (15 instead of 12 MoE dispatches).
+* *Efficiency:* no evidence in favour. A rough two-point power-law fit of B's own pilot and MAIN losses suggests that
+  15% more training tokens would improve B by ~0.09 nats, about three times the fusion gain. This is an extrapolation,
+  which is exactly why Amendment 5 tests it directly with an iso-FLOP baseline.
+* *Mechanism:* the premise "B loses interaction, C recovers it" does not hold here, since B loses nothing to A. The
+  simplest explanation of C_same's gain is added depth and capacity, which C_matched supports.
+
+## 6. Limitations
+
+* **Scale.** ~160M active parameters and 100M tokens (~0.6 tokens per active parameter, far below compute-optimal):
+  small-scale architectural evidence, not a claim about billion-parameter LLMs.
+* **Seeds.** MAIN is a single seed; paired CIs only cover validation noise. The 0.053-nat threshold comes from one
+  measured seed pair.
+* **Recipe.** One shared learning rate for all architectures (by design, untuned); the parallel advantage may be
+  partly recipe-dependent.
+* **Schedule.** Time-to-target and loss-at-common-time read intermediate points of a cosine schedule, which are
+  pessimistic for the slower model (Hoffmann et al., 2022).
+* **Implementation.** Reference (sequential-dispatch) MoE; wall-clock numbers are specific to it.
+
+## 7. Next steps (Amendment 5)
+
+Written **before** any follow-up run ([spec §6e](moe_fusion_experiment/EXPERIMENT_SPEC.md)); each step runs only if
+the previous one leaves the question open.
+
+```mermaid
+flowchart TD
+  S1["Step 1 · B_isoflop<br/>B trained on C_same's FLOPs<br/>1753 steps, 114.9M tokens"] --> Q1{"C_same better than<br/>B_isoflop by ≥ 0.02 nats?"}
+  Q1 -- "no" --> STOP["Fusion is not a more compute-efficient<br/>use of the extra compute → stop the efficiency line"]
+  Q1 -- "yes" --> S4["Step 4 · seed 43 replication<br/>of C_same and B_isoflop"]
+  S2["Step 2 · knock-out on trained C_same<br/>(no training): which fusion position matters?"] --> S3["Step 3 · one fusion layer at the best position<br/>vs its own iso-FLOP B · seeds 42 + 43"]
+  S4 --> OPT["Optional · progressive growth C_grow<br/>(insert fusion layers at 25% of training)"]
+```
+
+| step | what | cost (A100) |
+|---|---|---|
+| 1 | **B_isoflop**: is fusion better than simply training B longer on the same compute? | ~1 h |
+| 2 | **Knock-out** of each fusion layer in the trained C_same (no training) | ~15 min |
+| 3 | **One fusion layer** (`fusion_interval: 8` or `final_only`, ~+5% FLOPs) vs its iso-FLOP B, 2 seeds | ~2.5 h |
+| 4 | **Seed 43** for anything still undecided | ~1.5 h |
+
+Not planned: a 400M-token MAIN (C_same − B is flat after ~65M tokens, so the expected information per GPU-hour is low).
+
+## 8. Reproduce
+
+Everything runs from **one Colab cell** on an A100; the cell asks for the code zip
+([`dist/moe_fusion_experiment.zip`](dist/moe_fusion_experiment.zip), v1.4.2), restores or rebuilds the dataset
+byte-identically, runs environment checks, the test suite, the memory probe and a smoke test, then trains and writes the
+report, plots and a results zip (mirrored to Google Drive; interrupted runs resume from checkpoints).
+
+| phase | cell | time |
+|---|---|---|
+| Pilot | [`colab/PILOT_SINGLE_CELL.py`](moe_fusion_experiment/colab/PILOT_SINGLE_CELL.py) | ~1 h (incl. systems benchmark + profiling) |
+| Diagnostics | [`colab/DIAG_SINGLE_CELL.py`](moe_fusion_experiment/colab/DIAG_SINGLE_CELL.py) | ~1.6 h |
+| MAIN | [`colab/MAIN_SINGLE_CELL.py`](moe_fusion_experiment/colab/MAIN_SINGLE_CELL.py) | ~2.9 h |
+
+Locally:
+
+```bash
+cd moe_fusion_experiment
+pip install -r requirements.txt
+python -m pytest -q tests                                   # 58 CPU tests (+7 CUDA tests on a GPU)
+python scripts/run_pipeline.py --mode main --data-dir /path/to/moe_data --out runs
+python scripts/aggregate_results.py --root runs/main --mode main
+python ../docs/figures/make_figures.py                      # README figures from ../results
+```
+
+## 9. Repository layout
+
+```
+README.md                    this page
+docs/
+  figures/                   README figures (light + dark) and the script that builds them from results/
+  presentation/              slide deck (Marp source + PDF)
+  BULGULAR_TR.md             full analysis in Turkish
+  concept/                   the original idea (Turkish), the engineering brief, the original data manifests
+results/
+  pilot/  diagnostics/  main/   machine-generated reports, results.json, per-run metrics, plots
+moe_fusion_experiment/       the code: src/moefusion (models, MoE, trainer, analysis), scripts, configs, tests, colab
+dist/moe_fusion_experiment.zip   the package uploaded by the Colab cells
+```
+
+Profiler traces from the pilot (~170 MB) are not committed.
+
+## 10. References
+
+Full list with the specific claims used: [`REFERENCES.md`](moe_fusion_experiment/REFERENCES.md). Key ones:
+Chowdhery et al. 2022 (PaLM, parallel layers) · Wang & Komatsuzaki 2021 (GPT-J) · Black et al. 2022 (GPT-NeoX-20B) ·
+Fedus et al. 2022 (Switch Transformers) · Jiang et al. 2024 (Mixtral) · Dai et al. 2022 (StableMoE) ·
+Hoffmann et al. 2022 (Chinchilla) · Penedo et al. 2024 (FineWeb) · Press et al. 2020 (Sandwich Transformer).
+
+---
+
+<sub>Licensed under MIT (see [LICENSE](LICENSE)). Experiment design, code and analysis were developed with
+Claude Code.</sub>

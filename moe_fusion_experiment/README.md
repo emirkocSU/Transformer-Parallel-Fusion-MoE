@@ -5,13 +5,16 @@ A controlled architecture experiment for one question:
 > Can the strict Attention → MoE dependency be removed from most Transformer layers (Attention ∥ MoE),
 > with the lost interaction recovered by periodic FusionMoE layers, for a better quality-vs-wall-clock trade-off?
 
+> **Results and the experiment write-up** (pilot, diagnostics, MAIN, figures, slides, next steps) are in the
+> [repository README](../README.md); raw logs and generated reports are in [`../results/`](../results/).
+
 * Pre-registration (hypotheses, fixed conditions, decision rules): [`EXPERIMENT_SPEC.md`](EXPERIMENT_SPEC.md)
 * How confounders are controlled: [`METHODOLOGY.md`](METHODOLOGY.md)
 * Verified literature: [`REFERENCES.md`](REFERENCES.md)
 
 ## DIAGNOSTICS (run BEFORE MAIN) — why did B beat A in the pilot?
 
-Paste [`colab/DIAG_SINGLE_CELL.py`](colab/DIAG_SINGLE_CELL.py) into one Colab cell (A100) and upload the zip (v1.4.1).
+Paste [`colab/DIAG_SINGLE_CELL.py`](colab/DIAG_SINGLE_CELL.py) into one Colab cell (A100) and upload the zip (v1.4.2).
 Four groups of A vs B at the pilot budget (seed 42, dense control, 10% warm-up, seed 43) plus routing-stability
 measurement, ~1.7 h; writes `/content/moe_fusion_runs/DIAG_REPORT.md` with the pre-registered rules R1-R4
 (EXPERIMENT_SPEC Amendment 3).
@@ -19,7 +22,7 @@ measurement, ~1.7 h; writes `/content/moe_fusion_runs/DIAG_REPORT.md` with the p
 ## MAIN (100M tokens, seed 42)
 
 Paste [`colab/MAIN_SINGLE_CELL.py`](colab/MAIN_SINGLE_CELL.py) into one Colab cell (A100) and run it; upload
-`moe_fusion_experiment.zip` (version 1.4.1) when asked. Runs B, C_same, C_matched, A for 100M tokens each (~3-3.3 h),
+`moe_fusion_experiment.zip` (version 1.4.2) when asked. Runs B, C_same, C_matched, A for 100M tokens each (~3-3.3 h),
 then writes `/content/moe_fusion_runs/main/FINAL_REPORT.md` with the pre-registered fusion verdict
 (EXPERIMENT_SPEC Amendment 2). Results are mirrored to `MyDrive/moe_fusion_experiment/runs/main/`.
 
@@ -86,7 +89,7 @@ src/moefusion/      config, rmsnorm, rope, attention, moe, blocks, model, data, 
                     flop_counter, benchmarking, trace_analysis, dataset_verify, tokenizer, analysis, utils
 scripts/            pipeline, phases, aggregation, plots, report, fallback data/tokenizer preparation
 tests/              pytest suite (CPU + CUDA tests)
-colab/              PILOT_SINGLE_CELL.py and the notebook
+colab/              PILOT / DIAG / MAIN single cells and their notebooks
 data_reference/     the manifest + tokenizer.json of the prepared dataset (hash-verified at runtime)
 ```
 

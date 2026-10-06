@@ -1,0 +1,5 @@
+{"step": 16, "event": "dead_expert_alert", "layers": [14], "layer_names": ["fusion_after_block11"], "min_fraction": 0.0121}
+{"step": 32, "event": "dead_expert_cleared", "layers": [], "layer_names": [], "min_fraction": 0.07559}
+{"step": 400, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/main/runs/C_parallel_fusion_matched_seed42/checkpoint.pt", "seconds": 16.41982639699927, "bytes_estimate": 5830398404, "deleted_old_first": false, "free_bytes_before": 62159372288}
+{"step": 800, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/main/runs/C_parallel_fusion_matched_seed42/checkpoint.pt", "seconds": 20.005458167999677, "bytes_estimate": 5830398404, "deleted_old_first": false, "free_bytes_before": 56426557440}
+{"step": 1200, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/main/runs/C_parallel_fusion_matched_seed42/checkpoint.pt", "seconds": 15.6881453219994, "bytes_estimate": 5830398404, "deleted_old_first": false, "free_bytes_before": 56426016768}

@@ -1,0 +1,13 @@
+{
+  "selected": "sdpa_flash",
+  "fallback_used": false,
+  "efficient_kernel": true,
+  "attempts": [
+    {
+      "requested": "sdpa_flash",
+      "ok": true,
+      "error": null,
+      "max_abs_err_vs_fp32": 0.009213685989379883
+    }
+  ]
+}

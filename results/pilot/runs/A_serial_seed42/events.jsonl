@@ -1,0 +1,4 @@
+{"step": 16, "event": "expert_imbalance_alert", "maxmin_ratio": 81.79000403063282}
+{"step": 48, "event": "expert_imbalance_cleared", "maxmin_ratio": 5.826294202416584}
+{"step": 128, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/pilot/runs/A_serial_seed42/checkpoint.pt", "seconds": 15.974459237000247, "bytes_estimate": 5830149512, "deleted_old_first": false, "free_bytes_before": 70822023168}
+{"step": 256, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/pilot/runs/A_serial_seed42/checkpoint.pt", "seconds": 14.893335689000196, "bytes_estimate": 5830149512, "deleted_old_first": false, "free_bytes_before": 65089597440}

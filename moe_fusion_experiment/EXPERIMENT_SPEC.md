@@ -162,8 +162,39 @@ The diagnostics also measured, for the first time, the seed-to-seed variability 
 variant(s) concerned before any conclusion. The worse-case value 0.053 is used (it includes the late B-seed-43
 validation uptick at step 384) rather than the smaller pre-uptick value, to avoid choosing the threshold favourably.
 
+## 6e. Amendment 5 -- follow-up plan after MAIN (written after MAIN, before any follow-up run; NOT yet run)
+
+*MAIN results (seed 42, 100M tokens, full validation set):* B - A = -0.0891; C_same - B = -0.0293 (INCONCLUSIVE under
+Amendment 4); C_matched - B = -0.0021 (approximately equal); C_matched - C_same = +0.0272. The C_same - B difference is
+~0 until ~20M tokens and settles at about -0.028 after ~65M tokens; C_matched - C_same is a constant ~+0.027 from 8M
+tokens on, so C_matched - B = (width cost) + (fusion gain) crosses zero at ~67M tokens. Wall-clock: B 32.3 min,
+C_matched 35.2 min (+9%, same FLOPs), C_same 37.7 min (+17%, +15% FLOPs). At B's finishing wall-clock B has the lowest
+loss (4.0656 vs 4.0821 C_same, 4.0857 C_matched); C_same reaches B's final loss after 90.0M tokens (~3% more FLOPs than
+B). The open question is therefore not whether fusion adds quality, but whether it is a better use of compute than the
+baseline spending the same compute.
+
+*Planned steps (in this order; each step runs only if the previous one leaves the question open):*
+1. **Iso-FLOP baseline.** `B_isoflop`: B trained for 1753 steps (114.9M tokens, its own cosine schedule) = the FLOPs of
+   C_same's 1526 steps. Compare to the existing C_same run, paired on the full validation set.
+   Rule: if dL(C_same - B_isoflop) > -0.02, periodic fusion is NOT a more compute-efficient use of the extra compute ->
+   stop the efficiency line. If dL <= -0.02 (CI excluding 0), continue with step 4 for C_same and B_isoflop.
+2. **Fusion-layer knock-out (no training).** On the trained C_same weights, remove each fusion layer, each pair and all
+   three (residual identity) and measure the full-validation loss increase. Purpose: rank the positions (after blocks
+   4 / 8 / 12) to choose the position of the single-fusion variant. Post-hoc removal measures dependence of the trained
+   network, not the value of training with that layer, so it only selects a candidate.
+3. **Single fusion layer.** `C1_same` (one FusionMoE at the best position from step 2: `fusion_interval: 8` or
+   `final_only`, ~+5% FLOPs) against its own iso-FLOP B (same total FLOPs), seeds 42 and 43 from the start, because the
+   expected effect (0.01-0.03 nats) is below the 0.053-nat single-seed threshold.
+4. **Replication.** Seed 43 for every comparison still undecided; with two seeds the threshold is max(0.02, observed
+   seed spread) as in Amendment 2.
+*Optional, only if step 1 favours C_same:* progressive growth (`C_grow`: B for the first 25% of steps, then insert the
+three fusion layers with zero-initialised output projections so the function is unchanged at insertion), compared to
+B_isoflop at equal total FLOPs.
+*Not planned:* a longer (e.g. 400M-token) MAIN. C_same - B is flat after ~65M tokens and the width cost is constant, so
+the expected information per GPU-hour is low; the systems track (fused input projections / concurrency) stays separate.
+
 ## 7. Phases
 
 0 environment, 1 data verification, 2 unit tests, 3 budget, 4 memory probe, 5 smoke, 6 systems benchmark,
-7 profiling, 8 training (pilot), 9 report. MAIN, 3-seed replication and the fusion-interval ablation (2 / 8 /
+7 profiling, 8 training (pilot), 9 report. MAIN (Amendment 2), DIAG (Amendment 3) and the Amendment 5 follow-ups (incl. the fusion-interval ablation 2 / 8 /
 final-only, widths from `flop_counter.matched_hidden`) are NOT run automatically.

@@ -1,0 +1,93 @@
+{
+  "passed": true,
+  "models": {
+    "A_serial": {
+      "checks": {
+        "checkpoint_saved": true,
+        "checkpoint_resumed": true,
+        "train_loss_decreased": true,
+        "val_loss_decreased": true,
+        "finite": true,
+        "no_router_collapse": true,
+        "evaluation_works": true
+      },
+      "first_train_loss": 10.556450843811035,
+      "last_train_loss_mean4": 7.751239657402039,
+      "transient_collapse_warnings": [],
+      "final_collapsed_layers": [],
+      "final_util_cv_mean": 0.6299414213375604,
+      "final_balance_loss_per_router": 1.0948760509490967,
+      "initial_val_loss": 10.56509920382814,
+      "final_val_loss": 7.704550895223292,
+      "tokens_per_sec": 52014.600420135546,
+      "steps": 24,
+      "passed": true
+    },
+    "B_parallel": {
+      "checks": {
+        "checkpoint_saved": true,
+        "checkpoint_resumed": true,
+        "train_loss_decreased": true,
+        "val_loss_decreased": true,
+        "finite": true,
+        "no_router_collapse": true,
+        "evaluation_works": true
+      },
+      "first_train_loss": 10.565433502197266,
+      "last_train_loss_mean4": 7.58104133605957,
+      "transient_collapse_warnings": [],
+      "final_collapsed_layers": [],
+      "final_util_cv_mean": 0.3368697320829381,
+      "final_balance_loss_per_router": 1.0193488597869873,
+      "initial_val_loss": 10.57150689586706,
+      "final_val_loss": 7.52845687691314,
+      "tokens_per_sec": 50941.30068360708,
+      "steps": 24,
+      "passed": true
+    },
+    "C_parallel_fusion_samewidth": {
+      "checks": {
+        "checkpoint_saved": true,
+        "checkpoint_resumed": true,
+        "train_loss_decreased": true,
+        "val_loss_decreased": true,
+        "finite": true,
+        "no_router_collapse": true,
+        "evaluation_works": true
+      },
+      "first_train_loss": 10.566082954406738,
+      "last_train_loss_mean4": 7.599756836891174,
+      "transient_collapse_warnings": [],
+      "final_collapsed_layers": [],
+      "final_util_cv_mean": 0.4431030006707145,
+      "final_balance_loss_per_router": 1.0451972484588623,
+      "initial_val_loss": 10.571636027561908,
+      "final_val_loss": 7.545972287190523,
+      "tokens_per_sec": 43576.08312610361,
+      "steps": 24,
+      "passed": true
+    },
+    "C_parallel_fusion_matched": {
+      "checks": {
+        "checkpoint_saved": true,
+        "checkpoint_resumed": true,
+        "train_loss_decreased": true,
+        "val_loss_decreased": true,
+        "finite": true,
+        "no_router_collapse": true,
+        "evaluation_works": true
+      },
+      "first_train_loss": 10.55886173248291,
+      "last_train_loss_mean4": 7.61089551448822,
+      "transient_collapse_warnings": [],
+      "final_collapsed_layers": [],
+      "final_util_cv_mean": 0.3929449438712819,
+      "final_balance_loss_per_router": 1.021772861480713,
+      "initial_val_loss": 10.566934806782228,
+      "final_val_loss": 7.558981467771844,
+      "tokens_per_sec": 46529.06372579558,
+      "steps": 24,
+      "passed": true
+    }
+  }
+}

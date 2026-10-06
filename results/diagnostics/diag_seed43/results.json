@@ -1,0 +1,966 @@
+{
+  "root": "/content/moe_fusion_runs/diag_seed43",
+  "n_completed": 2,
+  "failed_runs": [],
+  "pre_registered": {
+    "equivalence_margin_nats": 0.02,
+    "speed_margin": 0.02
+  },
+  "runs": {
+    "A": {
+      "name": "A_serial",
+      "train_config": {
+        "seq_len": 1024,
+        "global_batch_seqs": 64,
+        "micro_batch_seqs": 16,
+        "total_steps": 384,
+        "lr": 0.0003,
+        "min_lr_ratio": 0.1,
+        "warmup_frac": 0.02,
+        "beta1": 0.9,
+        "beta2": 0.95,
+        "eps": 1e-08,
+        "weight_decay": 0.1,
+        "grad_clip": 1.0,
+        "balance_coef": 0.01,
+        "aux_loss_reduction": "sum",
+        "zloss_coef": 0.0,
+        "precision": "bf16",
+        "seed": 43,
+        "data_seed": null,
+        "eval_every": 32,
+        "eval_seqs": 1024,
+        "final_eval_seqs": null,
+        "log_every": 8,
+        "ckpt_every": 128,
+        "untimed_warmup_microbatches": 2,
+        "collapse_min_fraction": 0.01,
+        "collapse_patience": 3,
+        "imbalance_alert_ratio": 10.0,
+        "dead_expert_fraction": 0.0125
+      },
+      "micro_batch_seqs": 16,
+      "grad_accum": 4,
+      "final_val_loss": 5.471263174705447,
+      "final_val_ppl": 237.7603359969757,
+      "final_val_tokens": 15450112,
+      "steps": 384,
+      "tokens": 25165824,
+      "train_seconds": 490.56500808499914,
+      "tokens_per_sec": 51299.67198076136,
+      "step_time_median": 1.2739085940002042,
+      "step_time_p95": 1.2954091041498486,
+      "step_time_mean": 1.277267670291444,
+      "step_time_std": 0.008162158316936523,
+      "data_wait_median": 0.002060407499811845,
+      "peak_mem_alloc_gb": 29.91063552,
+      "peak_mem_reserved_gb": 35.26361088,
+      "params_total": 477653760,
+      "params_active": 159148800,
+      "flops_train_per_token": 1068023808,
+      "n_moe": 12,
+      "expert_hidden": 1920,
+      "router_final": {
+        "util_cv_mean": 0.03663666676721357,
+        "util_cv_max": 0.08451332585460491,
+        "util_maxmin_ratio_max": 1.3154852525387717,
+        "util_min_fraction": 0.11363410949707031,
+        "router_entropy": 1.59555983543396,
+        "router_entropy_max": 2.0794415416798357,
+        "per_layer_fraction": [
+          [
+            0.11862,
+            0.13337,
+            0.12883,
+            0.12756,
+            0.11586,
+            0.12444,
+            0.12174,
+            0.12959
+          ],
+          [
+            0.11591,
+            0.14998,
+            0.12436,
+            0.11401,
+            0.12982,
+            0.12433,
+            0.11904,
+            0.12255
+          ],
+          [
+            0.12066,
+            0.12398,
+            0.1233,
+            0.13143,
+            0.12286,
+            0.13005,
+            0.12367,
+            0.12404
+          ],
+          [
+            0.12005,
+            0.12755,
+            0.12259,
+            0.12426,
+            0.12268,
+            0.12991,
+            0.12778,
+            0.12518
+          ],
+          [
+            0.12692,
+            0.12844,
+            0.12509,
+            0.12123,
+            0.12184,
+            0.13094,
+            0.12121,
+            0.12432
+          ],
+          [
+            0.13189,
+            0.12028,
+            0.12142,
+            0.12455,
+            0.12313,
+            0.12829,
+            0.12429,
+            0.12615
+          ],
+          [
+            0.12552,
+            0.13141,
+            0.1214,
+            0.12306,
+            0.12291,
+            0.12801,
+            0.12377,
+            0.12393
+          ],
+          [
+            0.11816,
+            0.12424,
+            0.12683,
+            0.12485,
+            0.13355,
+            0.12506,
+            0.12205,
+            0.12527
+          ],
+          [
+            0.12737,
+            0.11852,
+            0.12157,
+            0.12231,
+            0.13389,
+            0.12516,
+            0.12502,
+            0.12616
+          ],
+          [
+            0.12426,
+            0.12203,
+            0.12108,
+            0.12824,
+            0.12477,
+            0.12939,
+            0.1266,
+            0.12362
+          ],
+          [
+            0.11962,
+            0.12137,
+            0.1342,
+            0.12877,
+            0.1209,
+            0.12452,
+            0.12054,
+            0.13008
+          ],
+          [
+            0.11363,
+            0.13225,
+            0.12694,
+            0.1292,
+            0.1189,
+            0.12005,
+            0.12756,
+            0.13147
+          ]
+        ]
+      },
+      "events": [
+        {
+          "step": 16,
+          "event": "expert_imbalance_alert",
+          "maxmin_ratio": 674.6309523809524
+        },
+        {
+          "step": 16,
+          "event": "dead_expert_alert",
+          "layers": [
+            1
+          ],
+          "layer_names": [
+            "block1"
+          ],
+          "min_fraction": 0.00032
+        },
+        {
+          "step": 32,
+          "event": "expert_imbalance_cleared",
+          "maxmin_ratio": 7.361946695760598
+        },
+        {
+          "step": 32,
+          "event": "dead_expert_cleared",
+          "layers": [],
+          "layer_names": [],
+          "min_fraction": 0.02448
+        },
+        {
+          "step": 128,
+          "event": "checkpoint_saved",
+          "path": "/content/moe_fusion_runs/diag_seed43/runs/A_serial_seed43/checkpoint.pt",
+          "seconds": 19.26583431800009,
+          "bytes_estimate": 5830149512,
+          "deleted_old_first": false,
+          "free_bytes_before": 66412269568
+        },
+        {
+          "step": 256,
+          "event": "checkpoint_saved",
+          "path": "/content/moe_fusion_runs/diag_seed43/runs/A_serial_seed43/checkpoint.pt",
+          "seconds": 15.25795644199934,
+          "bytes_estimate": 5830149512,
+          "deleted_old_first": false,
+          "free_bytes_before": 60678828032
+        }
+      ]
+    },
+    "B": {
+      "name": "B_parallel",
+      "train_config": {
+        "seq_len": 1024,
+        "global_batch_seqs": 64,
+        "micro_batch_seqs": 16,
+        "total_steps": 384,
+        "lr": 0.0003,
+        "min_lr_ratio": 0.1,
+        "warmup_frac": 0.02,
+        "beta1": 0.9,
+        "beta2": 0.95,
+        "eps": 1e-08,
+        "weight_decay": 0.1,
+        "grad_clip": 1.0,
+        "balance_coef": 0.01,
+        "aux_loss_reduction": "sum",
+        "zloss_coef": 0.0,
+        "precision": "bf16",
+        "seed": 43,
+        "data_seed": null,
+        "eval_every": 32,
+        "eval_seqs": 1024,
+        "final_eval_seqs": null,
+        "log_every": 8,
+        "ckpt_every": 128,
+        "untimed_warmup_microbatches": 2,
+        "collapse_min_fraction": 0.01,
+        "collapse_patience": 3,
+        "imbalance_alert_ratio": 10.0,
+        "dead_expert_fraction": 0.0125
+      },
+      "micro_batch_seqs": 16,
+      "grad_accum": 4,
+      "final_val_loss": 5.352339069416288,
+      "final_val_ppl": 211.1015018893835,
+      "final_val_tokens": 15450112,
+      "steps": 384,
+      "tokens": 25165824,
+      "train_seconds": 490.2543752420006,
+      "tokens_per_sec": 51332.17625559707,
+      "step_time_median": 1.273926070500238,
+      "step_time_p95": 1.2934896393499913,
+      "step_time_mean": 1.2759953646631048,
+      "step_time_std": 0.006841921167053698,
+      "data_wait_median": 0.0020696054994004953,
+      "peak_mem_alloc_gb": 29.304185344,
+      "peak_mem_reserved_gb": 32.617005056,
+      "params_total": 477653760,
+      "params_active": 159148800,
+      "flops_train_per_token": 1068023808,
+      "n_moe": 12,
+      "expert_hidden": 1920,
+      "router_final": {
+        "util_cv_mean": 0.035397747197164646,
+        "util_cv_max": 0.059056094950509355,
+        "util_maxmin_ratio_max": 1.1732695635864514,
+        "util_min_fraction": 0.1118631362915039,
+        "router_entropy": 1.5798238515853882,
+        "router_entropy_max": 2.0794415416798357,
+        "per_layer_fraction": [
+          [
+            0.11275,
+            0.12552,
+            0.12976,
+            0.13125,
+            0.129,
+            0.12551,
+            0.12269,
+            0.12353
+          ],
+          [
+            0.11604,
+            0.13508,
+            0.1343,
+            0.11896,
+            0.12463,
+            0.11846,
+            0.13278,
+            0.11975
+          ],
+          [
+            0.12501,
+            0.12084,
+            0.13125,
+            0.12709,
+            0.11186,
+            0.12989,
+            0.12864,
+            0.12541
+          ],
+          [
+            0.11505,
+            0.1278,
+            0.12714,
+            0.12799,
+            0.12869,
+            0.12603,
+            0.12224,
+            0.12505
+          ],
+          [
+            0.12399,
+            0.12793,
+            0.1307,
+            0.12219,
+            0.12292,
+            0.12333,
+            0.12541,
+            0.12352
+          ],
+          [
+            0.12783,
+            0.12596,
+            0.12755,
+            0.11758,
+            0.12522,
+            0.12941,
+            0.12227,
+            0.12418
+          ],
+          [
+            0.12506,
+            0.13141,
+            0.11908,
+            0.12337,
+            0.12683,
+            0.12704,
+            0.12391,
+            0.1233
+          ],
+          [
+            0.12007,
+            0.12455,
+            0.12235,
+            0.12473,
+            0.12765,
+            0.13331,
+            0.12386,
+            0.12348
+          ],
+          [
+            0.12546,
+            0.12642,
+            0.1146,
+            0.12465,
+            0.12334,
+            0.1341,
+            0.1228,
+            0.12863
+          ],
+          [
+            0.11847,
+            0.12166,
+            0.12123,
+            0.13337,
+            0.12378,
+            0.12409,
+            0.12659,
+            0.13082
+          ],
+          [
+            0.12516,
+            0.12525,
+            0.12523,
+            0.13,
+            0.12216,
+            0.12558,
+            0.11994,
+            0.12669
+          ],
+          [
+            0.1203,
+            0.1201,
+            0.12407,
+            0.11983,
+            0.12799,
+            0.12797,
+            0.13169,
+            0.12805
+          ]
+        ]
+      },
+      "events": [
+        {
+          "step": 16,
+          "event": "expert_imbalance_alert",
+          "maxmin_ratio": 23.02943548387097
+        },
+        {
+          "step": 16,
+          "event": "dead_expert_alert",
+          "layers": [
+            4
+          ],
+          "layer_names": [
+            "block4"
+          ],
+          "min_fraction": 0.0071
+        },
+        {
+          "step": 24,
+          "event": "expert_imbalance_cleared",
+          "maxmin_ratio": 3.4508430666549574
+        },
+        {
+          "step": 24,
+          "event": "dead_expert_cleared",
+          "layers": [],
+          "layer_names": [],
+          "min_fraction": 0.04344
+        },
+        {
+          "step": 128,
+          "event": "checkpoint_saved",
+          "path": "/content/moe_fusion_runs/diag_seed43/runs/B_parallel_seed43/checkpoint.pt",
+          "seconds": 14.306453093000528,
+          "bytes_estimate": 5830149512,
+          "deleted_old_first": false,
+          "free_bytes_before": 65405366272
+        },
+        {
+          "step": 256,
+          "event": "checkpoint_saved",
+          "path": "/content/moe_fusion_runs/diag_seed43/runs/B_parallel_seed43/checkpoint.pt",
+          "seconds": 15.336063907000607,
+          "bytes_estimate": 5830149512,
+          "deleted_old_first": false,
+          "free_bytes_before": 59673042944
+        }
+      ]
+    }
+  },
+  "paired": {
+    "B_minus_A": {
+      "mean": -0.11892410562880346,
+      "se": 0.00033870342993461855,
+      "ci95_normal": [
+        -0.1195879521529155,
+        -0.11826025910469141
+      ],
+      "ci95_bootstrap": [
+        -0.1195607493460684,
+        -0.11828193323941524
+      ],
+      "n_sequences": 15088,
+      "frac_sequences_b_better": 0.998210498409332,
+      "label": "Q1: B vs A (cost of removing same-layer Attention->MoE dependency)",
+      "classification": "better (CI excludes 0)"
+    }
+  },
+  "time_to_target": {
+    "rule": "targets = worst final periodic-subset loss (5.4624) + [0.0, 0.05, 0.1, 0.25]",
+    "targets": {
+      "5.4624": {
+        "A": {
+          "train_seconds": 490.56500808499914,
+          "tokens": 25165824.0
+        },
+        "B": {
+          "train_seconds": 351.53721869574014,
+          "tokens": 18016395.447556112
+        }
+      },
+      "5.5124": {
+        "A": {
+          "train_seconds": 431.4636103967606,
+          "tokens": 22118285.70221044
+        },
+        "B": {
+          "train_seconds": 325.7088926252318,
+          "tokens": 16686257.261284303
+        }
+      },
+      "5.5624": {
+        "A": {
+          "train_seconds": 389.1572509046036,
+          "tokens": 19937277.515452012
+        },
+        "B": {
+          "train_seconds": 304.21617345439785,
+          "tokens": 15578695.286438173
+        }
+      },
+      "5.7124": {
+        "A": {
+          "train_seconds": 308.52312269938005,
+          "tokens": 15785656.636233479
+        },
+        "B": {
+          "train_seconds": 249.36031633701265,
+          "tokens": 12753570.132968586
+        }
+      }
+    }
+  },
+  "common_wallclock": {
+    "t_star_seconds": 490.2543752420006,
+    "definition": "validation loss (periodic subset) linearly interpolated at the training wall-clock at which the FASTEST model finished its token budget",
+    "loss": {
+      "A": 5.46265682843174,
+      "B": 5.343562580227864
+    }
+  },
+  "fairness_audit": {
+    "passed": true,
+    "checks": [
+      {
+        "check": "train config identical (B_parallel vs A_serial)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "model config differs only in architecture fields (B_parallel)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical optimizer steps",
+        "passed": true,
+        "detail": "{'A_serial': 384, 'B_parallel': 384}"
+      },
+      {
+        "check": "identical training tokens",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical micro-batch / grad-accum",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical evaluation steps",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical final validation set",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "all runs (incl. resumed segments) on the same GPU model",
+        "passed": true,
+        "detail": "{'NVIDIA A100-SXM4-40GB'}"
+      },
+      {
+        "check": "identical attention_backend",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical moe_backend",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical parallel_backend",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical code fingerprint",
+        "passed": true,
+        "detail": "{'69b579d404fc19b5618e9569f274178f5fab5a41ef7df02233bc93271a00b3d6'}"
+      },
+      {
+        "check": "identical dataset hashes",
+        "passed": true,
+        "detail": ""
+      }
+    ]
+  },
+  "benchmark": null,
+  "overlap": null,
+  "dataset": {
+    "data_dir": "/content/moe_data",
+    "manifest_notes": {
+      "manifest_sha256": "b7048343254d68acc67137799e4e6b1224699a4515c28b3463d99bf8497045da",
+      "complete_marker": {
+        "manifest_sha256": "b7048343254d68acc67137799e4e6b1224699a4515c28b3463d99bf8497045da",
+        "revision": "87f09149ef4734204d70ed1d046ddc9ca3f2b8f9"
+      },
+      "complete_marker_matches_manifest": true,
+      "manifest_equals_reference": true
+    },
+    "rebuild": {
+      "identical_to_original": true,
+      "conventions": {
+        "validation_rule": "doc_index % 20 == 0",
+        "eot_per_doc": 1,
+        "eot_placement": "append",
+        "dtype": "uint16",
+        "row_len": 1025,
+        "jsonl_format": "id_text_utf8"
+      },
+      "checks": {
+        "tokenizer_identical": true,
+        "split_eot_candidates_matching_token_counts": [
+          [
+            0,
+            1
+          ]
+        ],
+        "validation_npy_identical": true,
+        "train_npy_identical": true,
+        "jsonl_format_identified": "id_text_utf8",
+        "validation_jsonl_identical": true,
+        "train_jsonl_identical": true
+      }
+    },
+    "tokenizer": {
+      "path": "/content/moe_data/tokenizer.json",
+      "sha256": "2a6d7dcaa8f5cfec135c835ff0cf5ffb14c1f9508c0cfb8113bfebc3883c2187",
+      "model_type": "BPE",
+      "vocab_size": 32000,
+      "special_tokens": {
+        "<|unk|>": 0,
+        "<|endoftext|>": 1
+      },
+      "eot_id": 1,
+      "pre_tokenizer": "ByteLevel"
+    },
+    "arrays": {
+      "checks": [
+        "train: token ids within [0, 32000)",
+        "train: row count matches manifest (287264)",
+        "train: usable (predicted) tokens match manifest (294158336)",
+        "train: sha256 matches manifest",
+        "validation: token ids within [0, 32000)",
+        "validation: row count matches manifest (15088)",
+        "validation: usable (predicted) tokens match manifest (15450112)",
+        "validation: sha256 matches manifest"
+      ],
+      "warnings": [],
+      "errors": [],
+      "train": {
+        "shape": [
+          287264,
+          1025
+        ],
+        "dtype": "uint16",
+        "min_token": 1,
+        "max_token": 31999,
+        "eot_count": 284999,
+        "row_layout": "seq_len+1 (input=row[:-1], target=row[1:])",
+        "sha256_file": "d71d97d2b474234f14196cdba3fe8dda2f34e6c8c5b28716e637a7f7ac51d796"
+      },
+      "validation": {
+        "shape": [
+          15088,
+          1025
+        ],
+        "dtype": "uint16",
+        "min_token": 1,
+        "max_token": 31999,
+        "eot_count": 14999,
+        "row_layout": "seq_len+1 (input=row[:-1], target=row[1:])",
+        "sha256_file": "09b2dd93ef7ce6de862fac7f94d033377e79c0966e7d03e905090a9dae86de33"
+      },
+      "passed": true
+    },
+    "separation": {
+      "train_docs": 285000,
+      "val_docs": 15000,
+      "source_ids_available": true,
+      "source_id_overlap": 0,
+      "exact_text_overlap_docs": 13,
+      "exact_text_overlap_fraction_of_val": 0.0008666666666666666,
+      "duplicate_texts_within_val": 0,
+      "passed": true
+    },
+    "tokenization_spot_check": {
+      "validation": {
+        "status": "VERIFIED",
+        "packing_mode": "append",
+        "n_docs": 200,
+        "details": {
+          "append": {
+            "compared_tokens": 180484,
+            "match": true,
+            "first_mismatch": null,
+            "match_fraction": 1.0
+          },
+          "prepend": {
+            "compared_tokens": 180484,
+            "match": false,
+            "first_mismatch": 0,
+            "match_fraction": 0.00021054497905631525
+          }
+        }
+      },
+      "train": {
+        "status": "VERIFIED",
+        "packing_mode": "append",
+        "n_docs": 200,
+        "details": {
+          "append": {
+            "compared_tokens": 172121,
+            "match": true,
+            "first_mismatch": null,
+            "match_fraction": 1.0
+          },
+          "prepend": {
+            "compared_tokens": 172121,
+            "match": false,
+            "first_mismatch": 0,
+            "match_fraction": 0.0001510565241893784
+          }
+        }
+      }
+    },
+    "errors": [],
+    "warnings": [
+      "13 validation documents have an exact-text duplicate in train under different source ids (web near-duplicates; reported, not removed)"
+    ],
+    "passed": true
+  },
+  "environment": {
+    "python": "3.13.15",
+    "platform": "Linux-6.6.122+-x86_64-with-glibc2.39",
+    "torch": "2.11.0+cu130",
+    "numpy": "2.1.3",
+    "cuda_available": true,
+    "torch_cuda_version": "13.0",
+    "cudnn": 92700,
+    "cpu_count": 12,
+    "ram_total_gb": 89.63,
+    "ram_available_gb": 87.0,
+    "disk_free_gb": 66.41,
+    "gpu_name": "NVIDIA A100-SXM4-40GB",
+    "gpu_total_memory_gb": 42.41,
+    "gpu_compute_capability": "8.0",
+    "gpu_count": 1,
+    "bf16_supported": true,
+    "flash_sdp_enabled": true,
+    "mem_efficient_sdp_enabled": true,
+    "math_sdp_enabled": true,
+    "tf32_matmul": false,
+    "float32_matmul_precision": "highest",
+    "nvidia_smi_query": "580.82.07, NVIDIA A100-SXM4-40GB, 40960 MiB, 1410 MHz",
+    "flash_attn_package": null,
+    "numerics": {
+      "allow_tf32_matmul": false,
+      "allow_tf32_cudnn": false,
+      "float32_matmul_precision": "highest",
+      "autocast_dtype": "bfloat16",
+      "note": "BF16 autocast for matmuls; FP32 master weights; FP32 router, norms, softmax/CE."
+    },
+    "moe_backend": {
+      "selected": "reference",
+      "reason": "pre-registered correctness reference; no external MoE package is installed (MegaBlocks/grouped-GEMM builds are fragile on Colab). The in-repo padded_bmm backend is only benchmarked, never used for the primary comparison."
+    },
+    "warnings": [],
+    "errors": []
+  },
+  "attention_backend": {
+    "selected": "sdpa_flash",
+    "fallback_used": false,
+    "efficient_kernel": true,
+    "attempts": [
+      {
+        "requested": "sdpa_flash",
+        "ok": true,
+        "error": null,
+        "max_abs_err_vs_fp32": 0.006381511688232422
+      }
+    ]
+  },
+  "model_budget": {
+    "rows": {
+      "A_serial": {
+        "analytic": {
+          "n_layers": 12,
+          "n_attention_layers": 12,
+          "n_moe_backbone": 12,
+          "n_moe_fusion": 0,
+          "n_moe_total": 12,
+          "expert_hidden": 1920,
+          "params_total": 477653760,
+          "params_embedding": 24576000,
+          "params_lm_head_untied": 0,
+          "params_attention": 28311552,
+          "params_router": 73728,
+          "params_experts": 424673280,
+          "params_norms": 19200,
+          "params_active_per_token": 159148800,
+          "params_active_nonembedding": 134572800,
+          "flops_fwd_linear_per_token": 318259200,
+          "flops_fwd_moe_per_token": 212336640,
+          "flops_fwd_attn_scores_per_token_full": 37748736,
+          "flops_fwd_attn_scores_per_token_causal": 18892800.0,
+          "flops_fwd_per_token": 356007936,
+          "flops_train_per_token": 1068023808,
+          "bf16_param_memory_gb": 0.95530752,
+          "fp32_param_plus_adam_memory_gb": 7.64246016,
+          "train_flops_total": 26877699179937792,
+          "tokens": 25165824
+        },
+        "measured": {
+          "total": 477653760,
+          "trainable": 477653760,
+          "embedding": 24576000,
+          "lm_head_untied": 0,
+          "attention": 28311552,
+          "router": 73728,
+          "experts_backbone": 424673280,
+          "experts_fusion": 0,
+          "norms": 19200,
+          "experts": 424673280
+        }
+      },
+      "B_parallel": {
+        "analytic": {
+          "n_layers": 12,
+          "n_attention_layers": 12,
+          "n_moe_backbone": 12,
+          "n_moe_fusion": 0,
+          "n_moe_total": 12,
+          "expert_hidden": 1920,
+          "params_total": 477653760,
+          "params_embedding": 24576000,
+          "params_lm_head_untied": 0,
+          "params_attention": 28311552,
+          "params_router": 73728,
+          "params_experts": 424673280,
+          "params_norms": 19200,
+          "params_active_per_token": 159148800,
+          "params_active_nonembedding": 134572800,
+          "flops_fwd_linear_per_token": 318259200,
+          "flops_fwd_moe_per_token": 212336640,
+          "flops_fwd_attn_scores_per_token_full": 37748736,
+          "flops_fwd_attn_scores_per_token_causal": 18892800.0,
+          "flops_fwd_per_token": 356007936,
+          "flops_train_per_token": 1068023808,
+          "bf16_param_memory_gb": 0.95530752,
+          "fp32_param_plus_adam_memory_gb": 7.64246016,
+          "train_flops_total": 26877699179937792,
+          "tokens": 25165824
+        },
+        "measured": {
+          "total": 477653760,
+          "trainable": 477653760,
+          "embedding": 24576000,
+          "lm_head_untied": 0,
+          "attention": 28311552,
+          "router": 73728,
+          "experts_backbone": 424673280,
+          "experts_fusion": 0,
+          "norms": 19200,
+          "experts": 424673280
+        }
+      }
+    },
+    "matched": {},
+    "fairness_notes": [
+      "B_parallel.name = B_parallel (vs A_serial: A_serial)",
+      "B_parallel.arch = parallel (vs A_serial: serial)"
+    ],
+    "errors": []
+  },
+  "probe": {
+    "micro_batch": 16,
+    "grad_accum": 4,
+    "forced": true,
+    "models": [
+      "A_serial",
+      "B_parallel"
+    ]
+  },
+  "smoke": null,
+  "tests": null,
+  "seeds": [
+    43
+  ],
+  "multi_seed": {
+    "seeds": [
+      43
+    ],
+    "models": [
+      "A",
+      "B"
+    ],
+    "final_loss": {
+      "A": {
+        "per_seed": {
+          "43": 5.471263174705447
+        },
+        "mean": 5.471263174705447,
+        "spread": 0.0,
+        "train_minutes_mean": 8.176083468083318
+      },
+      "B": {
+        "per_seed": {
+          "43": 5.352339069416288
+        },
+        "mean": 5.352339069416288,
+        "spread": 0.0,
+        "train_minutes_mean": 8.170906254033344
+      }
+    },
+    "comparisons": {
+      "B_minus_A": {
+        "per_seed_d": {
+          "43": -0.11892410562880346
+        },
+        "per_seed_ci": {
+          "43": [
+            -0.1195879521529155,
+            -0.11826025910469141
+          ]
+        },
+        "mean_d": -0.11892410562880346,
+        "seed_spread": null,
+        "threshold": 0.02,
+        "verdict": "better (CI excludes 0 and abs(dL) >= 0.020 nats)"
+      }
+    },
+    "wallclock": {},
+    "fusion_verdict": null,
+    "rule": "d_s = paired dL per seed; better/worse require the same sign with a CI excluding 0 in EVERY seed AND |mean d| >= max(0.02 nats, observed seed spread); equal requires |d| < 0.02 nats in every seed."
+  },
+  "mode": "pilot"
+}

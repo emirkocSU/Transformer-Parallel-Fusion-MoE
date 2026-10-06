@@ -1,0 +1,958 @@
+{
+  "root": "/content/moe_fusion_runs/diag_warmup10",
+  "n_completed": 2,
+  "failed_runs": [],
+  "pre_registered": {
+    "equivalence_margin_nats": 0.02,
+    "speed_margin": 0.02
+  },
+  "runs": {
+    "A": {
+      "name": "A_serial",
+      "train_config": {
+        "seq_len": 1024,
+        "global_batch_seqs": 64,
+        "micro_batch_seqs": 16,
+        "total_steps": 384,
+        "lr": 0.0003,
+        "min_lr_ratio": 0.1,
+        "warmup_frac": 0.1,
+        "beta1": 0.9,
+        "beta2": 0.95,
+        "eps": 1e-08,
+        "weight_decay": 0.1,
+        "grad_clip": 1.0,
+        "balance_coef": 0.01,
+        "aux_loss_reduction": "sum",
+        "zloss_coef": 0.0,
+        "precision": "bf16",
+        "seed": 42,
+        "data_seed": null,
+        "eval_every": 32,
+        "eval_seqs": 1024,
+        "final_eval_seqs": null,
+        "log_every": 8,
+        "ckpt_every": 128,
+        "untimed_warmup_microbatches": 2,
+        "collapse_min_fraction": 0.01,
+        "collapse_patience": 3,
+        "imbalance_alert_ratio": 10.0,
+        "dead_expert_fraction": 0.0125
+      },
+      "micro_batch_seqs": 16,
+      "grad_accum": 4,
+      "final_val_loss": 5.387093150680204,
+      "final_val_ppl": 218.56711955447904,
+      "final_val_tokens": 15450112,
+      "steps": 384,
+      "tokens": 25165824,
+      "train_seconds": 490.01838326199504,
+      "tokens_per_sec": 51356.897740191,
+      "step_time_median": 1.2723069540002143,
+      "step_time_p95": 1.2924865559500858,
+      "step_time_mean": 1.2753339618689705,
+      "step_time_std": 0.008062858600757256,
+      "data_wait_median": 0.0020240060000560334,
+      "peak_mem_alloc_gb": 29.90863872,
+      "peak_mem_reserved_gb": 33.227276288,
+      "params_total": 477653760,
+      "params_active": 159148800,
+      "flops_train_per_token": 1068023808,
+      "n_moe": 12,
+      "expert_hidden": 1920,
+      "router_final": {
+        "util_cv_mean": 0.03588712984957813,
+        "util_cv_max": 0.06456151972510721,
+        "util_maxmin_ratio_max": 1.2149091393640588,
+        "util_min_fraction": 0.11229133605957031,
+        "router_entropy": 1.5970706939697266,
+        "router_entropy_max": 2.0794415416798357,
+        "per_layer_fraction": [
+          [
+            0.11874,
+            0.126,
+            0.12762,
+            0.13177,
+            0.1292,
+            0.1147,
+            0.13174,
+            0.12023
+          ],
+          [
+            0.12218,
+            0.12569,
+            0.12009,
+            0.12055,
+            0.13006,
+            0.12519,
+            0.13026,
+            0.12598
+          ],
+          [
+            0.12008,
+            0.1292,
+            0.12789,
+            0.125,
+            0.12145,
+            0.13404,
+            0.12123,
+            0.1211
+          ],
+          [
+            0.12481,
+            0.12828,
+            0.12969,
+            0.12165,
+            0.12032,
+            0.12354,
+            0.12111,
+            0.13061
+          ],
+          [
+            0.12487,
+            0.12498,
+            0.13064,
+            0.12711,
+            0.1267,
+            0.12252,
+            0.11815,
+            0.12503
+          ],
+          [
+            0.12425,
+            0.12657,
+            0.12535,
+            0.12738,
+            0.12042,
+            0.12523,
+            0.12548,
+            0.12532
+          ],
+          [
+            0.12489,
+            0.12469,
+            0.12161,
+            0.13309,
+            0.12043,
+            0.12603,
+            0.12561,
+            0.12364
+          ],
+          [
+            0.13263,
+            0.12783,
+            0.12452,
+            0.11949,
+            0.1213,
+            0.12237,
+            0.1251,
+            0.12677
+          ],
+          [
+            0.12605,
+            0.12614,
+            0.12701,
+            0.12929,
+            0.12495,
+            0.12137,
+            0.12668,
+            0.1185
+          ],
+          [
+            0.13451,
+            0.12988,
+            0.12034,
+            0.12374,
+            0.12171,
+            0.12456,
+            0.11622,
+            0.12905
+          ],
+          [
+            0.1278,
+            0.12518,
+            0.13607,
+            0.12651,
+            0.12649,
+            0.1222,
+            0.11229,
+            0.12344
+          ],
+          [
+            0.12643,
+            0.11691,
+            0.12668,
+            0.132,
+            0.13912,
+            0.12835,
+            0.11451,
+            0.116
+          ]
+        ]
+      },
+      "events": [
+        {
+          "step": 8,
+          "event": "dead_expert_alert",
+          "layers": [
+            3
+          ],
+          "layer_names": [
+            "block3"
+          ],
+          "min_fraction": 0.01207
+        },
+        {
+          "step": 24,
+          "event": "dead_expert_cleared",
+          "layers": [],
+          "layer_names": [],
+          "min_fraction": 0.01317
+        },
+        {
+          "step": 32,
+          "event": "dead_expert_alert",
+          "layers": [
+            1,
+            11
+          ],
+          "layer_names": [
+            "block1",
+            "block11"
+          ],
+          "min_fraction": 0.0012
+        },
+        {
+          "step": 40,
+          "event": "expert_imbalance_alert",
+          "maxmin_ratio": 901.0373831775701
+        },
+        {
+          "step": 56,
+          "event": "expert_imbalance_cleared",
+          "maxmin_ratio": 5.989565520851509
+        },
+        {
+          "step": 56,
+          "event": "dead_expert_cleared",
+          "layers": [],
+          "layer_names": [],
+          "min_fraction": 0.02733
+        },
+        {
+          "step": 128,
+          "event": "checkpoint_saved",
+          "path": "/content/moe_fusion_runs/diag_warmup10/runs/A_serial_seed42/checkpoint.pt",
+          "seconds": 20.862701558000026,
+          "bytes_estimate": 5830149512,
+          "deleted_old_first": false,
+          "free_bytes_before": 68428910592
+        },
+        {
+          "step": 256,
+          "event": "checkpoint_saved",
+          "path": "/content/moe_fusion_runs/diag_warmup10/runs/A_serial_seed42/checkpoint.pt",
+          "seconds": 15.371725048000371,
+          "bytes_estimate": 5830149512,
+          "deleted_old_first": false,
+          "free_bytes_before": 62696452096
+        }
+      ]
+    },
+    "B": {
+      "name": "B_parallel",
+      "train_config": {
+        "seq_len": 1024,
+        "global_batch_seqs": 64,
+        "micro_batch_seqs": 16,
+        "total_steps": 384,
+        "lr": 0.0003,
+        "min_lr_ratio": 0.1,
+        "warmup_frac": 0.1,
+        "beta1": 0.9,
+        "beta2": 0.95,
+        "eps": 1e-08,
+        "weight_decay": 0.1,
+        "grad_clip": 1.0,
+        "balance_coef": 0.01,
+        "aux_loss_reduction": "sum",
+        "zloss_coef": 0.0,
+        "precision": "bf16",
+        "seed": 42,
+        "data_seed": null,
+        "eval_every": 32,
+        "eval_seqs": 1024,
+        "final_eval_seqs": null,
+        "log_every": 8,
+        "ckpt_every": 128,
+        "untimed_warmup_microbatches": 2,
+        "collapse_min_fraction": 0.01,
+        "collapse_patience": 3,
+        "imbalance_alert_ratio": 10.0,
+        "dead_expert_fraction": 0.0125
+      },
+      "micro_batch_seqs": 16,
+      "grad_accum": 4,
+      "final_val_loss": 5.190030203416294,
+      "final_val_ppl": 179.47397357710884,
+      "final_val_tokens": 15450112,
+      "steps": 384,
+      "tokens": 25165824,
+      "train_seconds": 489.18867905000707,
+      "tokens_per_sec": 51444.00326040136,
+      "step_time_median": 1.2712800535000497,
+      "step_time_p95": 1.2890213578499243,
+      "step_time_mean": 1.2731948873529606,
+      "step_time_std": 0.006599850094787131,
+      "data_wait_median": 0.002053211499742247,
+      "peak_mem_alloc_gb": 29.310921216,
+      "peak_mem_reserved_gb": 32.696696832,
+      "params_total": 477653760,
+      "params_active": 159148800,
+      "flops_train_per_token": 1068023808,
+      "n_moe": 12,
+      "expert_hidden": 1920,
+      "router_final": {
+        "util_cv_mean": 0.043579914437867094,
+        "util_cv_max": 0.06558127866247628,
+        "util_maxmin_ratio_max": 1.2389641942616432,
+        "util_min_fraction": 0.10912227630615234,
+        "router_entropy": 1.6017049551010132,
+        "router_entropy_max": 2.0794415416798357,
+        "per_layer_fraction": [
+          [
+            0.12231,
+            0.12676,
+            0.12417,
+            0.13126,
+            0.11756,
+            0.11672,
+            0.14016,
+            0.12107
+          ],
+          [
+            0.11794,
+            0.13041,
+            0.12689,
+            0.12587,
+            0.12146,
+            0.12164,
+            0.13412,
+            0.12166
+          ],
+          [
+            0.11922,
+            0.12752,
+            0.13704,
+            0.12113,
+            0.11814,
+            0.12609,
+            0.12262,
+            0.12824
+          ],
+          [
+            0.12316,
+            0.11977,
+            0.12745,
+            0.12432,
+            0.12839,
+            0.12457,
+            0.12126,
+            0.13108
+          ],
+          [
+            0.12824,
+            0.1205,
+            0.12927,
+            0.12891,
+            0.13424,
+            0.1168,
+            0.1177,
+            0.12434
+          ],
+          [
+            0.12245,
+            0.12316,
+            0.1348,
+            0.13006,
+            0.12433,
+            0.12357,
+            0.11377,
+            0.12786
+          ],
+          [
+            0.12323,
+            0.12802,
+            0.12139,
+            0.12217,
+            0.12085,
+            0.13048,
+            0.12777,
+            0.1261
+          ],
+          [
+            0.12612,
+            0.12785,
+            0.12847,
+            0.12911,
+            0.11655,
+            0.12339,
+            0.12335,
+            0.12516
+          ],
+          [
+            0.12328,
+            0.12704,
+            0.11927,
+            0.1273,
+            0.13098,
+            0.11899,
+            0.13312,
+            0.12002
+          ],
+          [
+            0.1276,
+            0.12747,
+            0.12094,
+            0.1142,
+            0.13172,
+            0.1243,
+            0.12615,
+            0.12761
+          ],
+          [
+            0.13497,
+            0.12364,
+            0.13053,
+            0.1239,
+            0.1352,
+            0.12459,
+            0.10912,
+            0.11806
+          ],
+          [
+            0.12294,
+            0.12454,
+            0.11968,
+            0.13335,
+            0.13832,
+            0.12336,
+            0.11642,
+            0.12139
+          ]
+        ]
+      },
+      "events": [
+        {
+          "step": 128,
+          "event": "checkpoint_saved",
+          "path": "/content/moe_fusion_runs/diag_warmup10/runs/B_parallel_seed42/checkpoint.pt",
+          "seconds": 17.636508563000007,
+          "bytes_estimate": 5830149512,
+          "deleted_old_first": false,
+          "free_bytes_before": 67421552640
+        },
+        {
+          "step": 256,
+          "event": "checkpoint_saved",
+          "path": "/content/moe_fusion_runs/diag_warmup10/runs/B_parallel_seed42/checkpoint.pt",
+          "seconds": 18.50295635099974,
+          "bytes_estimate": 5830149512,
+          "deleted_old_first": false,
+          "free_bytes_before": 61689139200
+        }
+      ]
+    }
+  },
+  "paired": {
+    "B_minus_A": {
+      "mean": -0.19706294597901822,
+      "se": 0.00034033765502919426,
+      "ci95_normal": [
+        -0.19772999552545825,
+        -0.19639589643257818
+      ],
+      "ci95_bootstrap": [
+        -0.19771605151945434,
+        -0.19640399189399257
+      ],
+      "n_sequences": 15088,
+      "frac_sequences_b_better": 1.0,
+      "label": "Q1: B vs A (cost of removing same-layer Attention->MoE dependency)",
+      "classification": "better (CI excludes 0)"
+    }
+  },
+  "time_to_target": {
+    "rule": "targets = worst final periodic-subset loss (5.3785) + [0.0, 0.05, 0.1, 0.25]",
+    "targets": {
+      "5.3785": {
+        "A": {
+          "train_seconds": 490.01838326199504,
+          "tokens": 25165824.0
+        },
+        "B": {
+          "train_seconds": 334.1759042361158,
+          "tokens": 17159841.795509588
+        }
+      },
+      "5.4285": {
+        "A": {
+          "train_seconds": 434.0713933908592,
+          "tokens": 22275198.95550886
+        },
+        "B": {
+          "train_seconds": 312.81342015368864,
+          "tokens": 16057196.956524583
+        }
+      },
+      "5.4785": {
+        "A": {
+          "train_seconds": 394.33072876463956,
+          "tokens": 20222561.675003666
+        },
+        "B": {
+          "train_seconds": 292.9892844095246,
+          "tokens": 15033908.557179585
+        }
+      },
+      "5.6285": {
+        "A": {
+          "train_seconds": 317.26637310707196,
+          "tokens": 16246454.138031892
+        },
+        "B": {
+          "train_seconds": 244.9313300315261,
+          "tokens": 12555689.823385926
+        }
+      }
+    }
+  },
+  "common_wallclock": {
+    "t_star_seconds": 489.18867905000707,
+    "definition": "validation loss (periodic subset) linearly interpolated at the training wall-clock at which the FASTEST model finished its token budget",
+    "loss": {
+      "A": 5.379198587797535,
+      "B": 5.1810738918705574
+    }
+  },
+  "fairness_audit": {
+    "passed": true,
+    "checks": [
+      {
+        "check": "train config identical (B_parallel vs A_serial)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "model config differs only in architecture fields (B_parallel)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical optimizer steps",
+        "passed": true,
+        "detail": "{'A_serial': 384, 'B_parallel': 384}"
+      },
+      {
+        "check": "identical training tokens",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical micro-batch / grad-accum",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical evaluation steps",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical final validation set",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "all runs (incl. resumed segments) on the same GPU model",
+        "passed": true,
+        "detail": "{'NVIDIA A100-SXM4-40GB'}"
+      },
+      {
+        "check": "identical attention_backend",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical moe_backend",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical parallel_backend",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "identical code fingerprint",
+        "passed": true,
+        "detail": "{'69b579d404fc19b5618e9569f274178f5fab5a41ef7df02233bc93271a00b3d6'}"
+      },
+      {
+        "check": "identical dataset hashes",
+        "passed": true,
+        "detail": ""
+      }
+    ]
+  },
+  "benchmark": null,
+  "overlap": null,
+  "dataset": {
+    "data_dir": "/content/moe_data",
+    "manifest_notes": {
+      "manifest_sha256": "b7048343254d68acc67137799e4e6b1224699a4515c28b3463d99bf8497045da",
+      "complete_marker": {
+        "manifest_sha256": "b7048343254d68acc67137799e4e6b1224699a4515c28b3463d99bf8497045da",
+        "revision": "87f09149ef4734204d70ed1d046ddc9ca3f2b8f9"
+      },
+      "complete_marker_matches_manifest": true,
+      "manifest_equals_reference": true
+    },
+    "rebuild": {
+      "identical_to_original": true,
+      "conventions": {
+        "validation_rule": "doc_index % 20 == 0",
+        "eot_per_doc": 1,
+        "eot_placement": "append",
+        "dtype": "uint16",
+        "row_len": 1025,
+        "jsonl_format": "id_text_utf8"
+      },
+      "checks": {
+        "tokenizer_identical": true,
+        "split_eot_candidates_matching_token_counts": [
+          [
+            0,
+            1
+          ]
+        ],
+        "validation_npy_identical": true,
+        "train_npy_identical": true,
+        "jsonl_format_identified": "id_text_utf8",
+        "validation_jsonl_identical": true,
+        "train_jsonl_identical": true
+      }
+    },
+    "tokenizer": {
+      "path": "/content/moe_data/tokenizer.json",
+      "sha256": "2a6d7dcaa8f5cfec135c835ff0cf5ffb14c1f9508c0cfb8113bfebc3883c2187",
+      "model_type": "BPE",
+      "vocab_size": 32000,
+      "special_tokens": {
+        "<|unk|>": 0,
+        "<|endoftext|>": 1
+      },
+      "eot_id": 1,
+      "pre_tokenizer": "ByteLevel"
+    },
+    "arrays": {
+      "checks": [
+        "train: token ids within [0, 32000)",
+        "train: row count matches manifest (287264)",
+        "train: usable (predicted) tokens match manifest (294158336)",
+        "train: sha256 matches manifest",
+        "validation: token ids within [0, 32000)",
+        "validation: row count matches manifest (15088)",
+        "validation: usable (predicted) tokens match manifest (15450112)",
+        "validation: sha256 matches manifest"
+      ],
+      "warnings": [],
+      "errors": [],
+      "train": {
+        "shape": [
+          287264,
+          1025
+        ],
+        "dtype": "uint16",
+        "min_token": 1,
+        "max_token": 31999,
+        "eot_count": 284999,
+        "row_layout": "seq_len+1 (input=row[:-1], target=row[1:])",
+        "sha256_file": "d71d97d2b474234f14196cdba3fe8dda2f34e6c8c5b28716e637a7f7ac51d796"
+      },
+      "validation": {
+        "shape": [
+          15088,
+          1025
+        ],
+        "dtype": "uint16",
+        "min_token": 1,
+        "max_token": 31999,
+        "eot_count": 14999,
+        "row_layout": "seq_len+1 (input=row[:-1], target=row[1:])",
+        "sha256_file": "09b2dd93ef7ce6de862fac7f94d033377e79c0966e7d03e905090a9dae86de33"
+      },
+      "passed": true
+    },
+    "separation": {
+      "train_docs": 285000,
+      "val_docs": 15000,
+      "source_ids_available": true,
+      "source_id_overlap": 0,
+      "exact_text_overlap_docs": 13,
+      "exact_text_overlap_fraction_of_val": 0.0008666666666666666,
+      "duplicate_texts_within_val": 0,
+      "passed": true
+    },
+    "tokenization_spot_check": {
+      "validation": {
+        "status": "VERIFIED",
+        "packing_mode": "append",
+        "n_docs": 200,
+        "details": {
+          "append": {
+            "compared_tokens": 180484,
+            "match": true,
+            "first_mismatch": null,
+            "match_fraction": 1.0
+          },
+          "prepend": {
+            "compared_tokens": 180484,
+            "match": false,
+            "first_mismatch": 0,
+            "match_fraction": 0.00021054497905631525
+          }
+        }
+      },
+      "train": {
+        "status": "VERIFIED",
+        "packing_mode": "append",
+        "n_docs": 200,
+        "details": {
+          "append": {
+            "compared_tokens": 172121,
+            "match": true,
+            "first_mismatch": null,
+            "match_fraction": 1.0
+          },
+          "prepend": {
+            "compared_tokens": 172121,
+            "match": false,
+            "first_mismatch": 0,
+            "match_fraction": 0.0001510565241893784
+          }
+        }
+      }
+    },
+    "errors": [],
+    "warnings": [
+      "13 validation documents have an exact-text duplicate in train under different source ids (web near-duplicates; reported, not removed)"
+    ],
+    "passed": true
+  },
+  "environment": {
+    "python": "3.13.15",
+    "platform": "Linux-6.6.122+-x86_64-with-glibc2.39",
+    "torch": "2.11.0+cu130",
+    "numpy": "2.1.3",
+    "cuda_available": true,
+    "torch_cuda_version": "13.0",
+    "cudnn": 92700,
+    "cpu_count": 12,
+    "ram_total_gb": 89.63,
+    "ram_available_gb": 86.71,
+    "disk_free_gb": 68.43,
+    "gpu_name": "NVIDIA A100-SXM4-40GB",
+    "gpu_total_memory_gb": 42.41,
+    "gpu_compute_capability": "8.0",
+    "gpu_count": 1,
+    "bf16_supported": true,
+    "flash_sdp_enabled": true,
+    "mem_efficient_sdp_enabled": true,
+    "math_sdp_enabled": true,
+    "tf32_matmul": false,
+    "float32_matmul_precision": "highest",
+    "nvidia_smi_query": "580.82.07, NVIDIA A100-SXM4-40GB, 40960 MiB, 1410 MHz",
+    "flash_attn_package": null,
+    "numerics": {
+      "allow_tf32_matmul": false,
+      "allow_tf32_cudnn": false,
+      "float32_matmul_precision": "highest",
+      "autocast_dtype": "bfloat16",
+      "note": "BF16 autocast for matmuls; FP32 master weights; FP32 router, norms, softmax/CE."
+    },
+    "moe_backend": {
+      "selected": "reference",
+      "reason": "pre-registered correctness reference; no external MoE package is installed (MegaBlocks/grouped-GEMM builds are fragile on Colab). The in-repo padded_bmm backend is only benchmarked, never used for the primary comparison."
+    },
+    "warnings": [],
+    "errors": []
+  },
+  "attention_backend": {
+    "selected": "sdpa_flash",
+    "fallback_used": false,
+    "efficient_kernel": true,
+    "attempts": [
+      {
+        "requested": "sdpa_flash",
+        "ok": true,
+        "error": null,
+        "max_abs_err_vs_fp32": 0.007326841354370117
+      }
+    ]
+  },
+  "model_budget": {
+    "rows": {
+      "A_serial": {
+        "analytic": {
+          "n_layers": 12,
+          "n_attention_layers": 12,
+          "n_moe_backbone": 12,
+          "n_moe_fusion": 0,
+          "n_moe_total": 12,
+          "expert_hidden": 1920,
+          "params_total": 477653760,
+          "params_embedding": 24576000,
+          "params_lm_head_untied": 0,
+          "params_attention": 28311552,
+          "params_router": 73728,
+          "params_experts": 424673280,
+          "params_norms": 19200,
+          "params_active_per_token": 159148800,
+          "params_active_nonembedding": 134572800,
+          "flops_fwd_linear_per_token": 318259200,
+          "flops_fwd_moe_per_token": 212336640,
+          "flops_fwd_attn_scores_per_token_full": 37748736,
+          "flops_fwd_attn_scores_per_token_causal": 18892800.0,
+          "flops_fwd_per_token": 356007936,
+          "flops_train_per_token": 1068023808,
+          "bf16_param_memory_gb": 0.95530752,
+          "fp32_param_plus_adam_memory_gb": 7.64246016,
+          "train_flops_total": 26877699179937792,
+          "tokens": 25165824
+        },
+        "measured": {
+          "total": 477653760,
+          "trainable": 477653760,
+          "embedding": 24576000,
+          "lm_head_untied": 0,
+          "attention": 28311552,
+          "router": 73728,
+          "experts_backbone": 424673280,
+          "experts_fusion": 0,
+          "norms": 19200,
+          "experts": 424673280
+        }
+      },
+      "B_parallel": {
+        "analytic": {
+          "n_layers": 12,
+          "n_attention_layers": 12,
+          "n_moe_backbone": 12,
+          "n_moe_fusion": 0,
+          "n_moe_total": 12,
+          "expert_hidden": 1920,
+          "params_total": 477653760,
+          "params_embedding": 24576000,
+          "params_lm_head_untied": 0,
+          "params_attention": 28311552,
+          "params_router": 73728,
+          "params_experts": 424673280,
+          "params_norms": 19200,
+          "params_active_per_token": 159148800,
+          "params_active_nonembedding": 134572800,
+          "flops_fwd_linear_per_token": 318259200,
+          "flops_fwd_moe_per_token": 212336640,
+          "flops_fwd_attn_scores_per_token_full": 37748736,
+          "flops_fwd_attn_scores_per_token_causal": 18892800.0,
+          "flops_fwd_per_token": 356007936,
+          "flops_train_per_token": 1068023808,
+          "bf16_param_memory_gb": 0.95530752,
+          "fp32_param_plus_adam_memory_gb": 7.64246016,
+          "train_flops_total": 26877699179937792,
+          "tokens": 25165824
+        },
+        "measured": {
+          "total": 477653760,
+          "trainable": 477653760,
+          "embedding": 24576000,
+          "lm_head_untied": 0,
+          "attention": 28311552,
+          "router": 73728,
+          "experts_backbone": 424673280,
+          "experts_fusion": 0,
+          "norms": 19200,
+          "experts": 424673280
+        }
+      }
+    },
+    "matched": {},
+    "fairness_notes": [
+      "B_parallel.name = B_parallel (vs A_serial: A_serial)",
+      "B_parallel.arch = parallel (vs A_serial: serial)"
+    ],
+    "errors": []
+  },
+  "probe": {
+    "micro_batch": 16,
+    "grad_accum": 4,
+    "forced": true,
+    "models": [
+      "A_serial",
+      "B_parallel"
+    ]
+  },
+  "smoke": null,
+  "tests": null,
+  "seeds": [
+    42
+  ],
+  "multi_seed": {
+    "seeds": [
+      42
+    ],
+    "models": [
+      "A",
+      "B"
+    ],
+    "final_loss": {
+      "A": {
+        "per_seed": {
+          "42": 5.387093150680204
+        },
+        "mean": 5.387093150680204,
+        "spread": 0.0,
+        "train_minutes_mean": 8.166973054366585
+      },
+      "B": {
+        "per_seed": {
+          "42": 5.190030203416294
+        },
+        "mean": 5.190030203416294,
+        "spread": 0.0,
+        "train_minutes_mean": 8.15314465083345
+      }
+    },
+    "comparisons": {
+      "B_minus_A": {
+        "per_seed_d": {
+          "42": -0.19706294597901822
+        },
+        "per_seed_ci": {
+          "42": [
+            -0.19772999552545825,
+            -0.19639589643257818
+          ]
+        },
+        "mean_d": -0.19706294597901822,
+        "seed_spread": null,
+        "threshold": 0.02,
+        "verdict": "better (CI excludes 0 and abs(dL) >= 0.020 nats)"
+      }
+    },
+    "wallclock": {},
+    "fusion_verdict": null,
+    "rule": "d_s = paired dL per seed; better/worse require the same sign with a CI excluding 0 in EVERY seed AND |mean d| >= max(0.02 nats, observed seed spread); equal requires |d| < 0.02 nats in every seed."
+  },
+  "mode": "pilot"
+}

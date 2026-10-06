@@ -1,0 +1,58 @@
+{
+  "gpu": "NVIDIA A100-SXM4-40GB",
+  "total_gb": 42.41,
+  "limit_gb": 36.0485,
+  "micro_batch": 16,
+  "grad_accum": 4,
+  "models": [
+    "A_serial",
+    "B_parallel",
+    "C_parallel_fusion_samewidth",
+    "C_parallel_fusion_matched"
+  ],
+  "trials": [
+    {
+      "model": "C_parallel_fusion_samewidth",
+      "mb": 32,
+      "ok": false,
+      "error": "OOM: CUDA out of memory. Tried to allocate 3.91 GiB. GPU 0 has a total capacity of 39.49 GiB of which 3.46 GiB is free. Including non-PyTorch memory, this process has 36.03 GiB memory in use. Of the allocated memory 34.72 GiB is allocated by PyTorch, and 825.25 MiB is reserved by PyTorch but unallocated.",
+      "fits": false
+    },
+    {
+      "model": "C_parallel_fusion_samewidth",
+      "mb": 16,
+      "ok": true,
+      "peak_alloc_gb": 32.752862208,
+      "peak_reserved_gb": 33.944502272,
+      "total_gb": 42.405855232,
+      "fits": true
+    },
+    {
+      "model": "C_parallel_fusion_matched",
+      "mb": 16,
+      "ok": true,
+      "peak_alloc_gb": 29.294102528,
+      "peak_reserved_gb": 31.608274944,
+      "total_gb": 42.405855232,
+      "fits": true
+    },
+    {
+      "model": "A_serial",
+      "mb": 16,
+      "ok": true,
+      "peak_alloc_gb": 28.830600192,
+      "peak_reserved_gb": 31.140610048,
+      "total_gb": 42.405855232,
+      "fits": true
+    },
+    {
+      "model": "B_parallel",
+      "mb": 16,
+      "ok": true,
+      "peak_alloc_gb": 28.23880704,
+      "peak_reserved_gb": 30.605836288,
+      "total_gb": 42.405855232,
+      "fits": true
+    }
+  ]
+}

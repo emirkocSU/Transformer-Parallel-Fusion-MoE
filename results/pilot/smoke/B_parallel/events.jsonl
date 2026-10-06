@@ -1,0 +1,3 @@
+{"step": 4, "event": "expert_imbalance_alert", "maxmin_ratio": 14.698604952957716}
+{"step": 16, "event": "expert_imbalance_alert", "maxmin_ratio": 1105.4803921568628}
+{"step": 24, "event": "expert_imbalance_cleared", "maxmin_ratio": 5.705161452233562}

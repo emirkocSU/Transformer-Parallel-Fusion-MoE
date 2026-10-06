@@ -1,0 +1,61 @@
+{
+  "phases": {
+    "env": {
+      "done": true,
+      "time": "2026-10-04 21:14:43",
+      "attention_backend": "sdpa_flash"
+    },
+    "dataset": {
+      "done": true,
+      "time": "2026-10-04 21:15:07"
+    },
+    "tests": {
+      "done": true,
+      "time": "2026-10-04 21:15:31",
+      "tests": 65,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": true
+    },
+    "inspect": {
+      "done": true,
+      "time": "2026-10-04 21:15:34"
+    },
+    "probe": {
+      "done": true,
+      "time": "2026-10-04 21:16:30",
+      "micro_batch": 16
+    },
+    "smoke": {
+      "done": true,
+      "time": "2026-10-04 21:21:12"
+    },
+    "train_B_parallel": {
+      "done": true,
+      "time": "2026-10-04 22:00:37",
+      "exit_code": 0
+    },
+    "train_C_parallel_fusion_samewidth": {
+      "done": true,
+      "time": "2026-10-04 22:46:31",
+      "exit_code": 0
+    },
+    "train_C_parallel_fusion_matched": {
+      "done": true,
+      "time": "2026-10-04 23:29:24",
+      "exit_code": 0
+    },
+    "train_A_serial": {
+      "done": true,
+      "time": "2026-10-05 00:09:00",
+      "exit_code": 0
+    },
+    "report": {
+      "done": true,
+      "time": "2026-10-05 00:09:10"
+    }
+  },
+  "attention_backend": "sdpa_flash",
+  "micro_batch": 16
+}

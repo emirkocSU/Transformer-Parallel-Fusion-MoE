@@ -1,0 +1,9 @@
+{
+  "micro_batch": 16,
+  "grad_accum": 4,
+  "forced": true,
+  "models": [
+    "A_dense",
+    "B_dense"
+  ]
+}

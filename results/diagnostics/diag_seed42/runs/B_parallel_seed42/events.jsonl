@@ -1,0 +1,6 @@
+{"step": 16, "event": "expert_imbalance_alert", "maxmin_ratio": 17.083083171463887}
+{"step": 16, "event": "dead_expert_alert", "layers": [4], "layer_names": ["block4"], "min_fraction": 0.0108}
+{"step": 24, "event": "expert_imbalance_cleared", "maxmin_ratio": 7.604482431149098}
+{"step": 24, "event": "dead_expert_cleared", "layers": [], "layer_names": [], "min_fraction": 0.02511}
+{"step": 128, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/diag_seed42/runs/B_parallel_seed42/checkpoint.pt", "seconds": 15.835133608999968, "bytes_estimate": 5830149512, "deleted_old_first": false, "free_bytes_before": 70183067648}
+{"step": 256, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/diag_seed42/runs/B_parallel_seed42/checkpoint.pt", "seconds": 18.76442446300007, "bytes_estimate": 5830149512, "deleted_old_first": false, "free_bytes_before": 64450347008}

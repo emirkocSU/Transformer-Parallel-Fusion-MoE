@@ -1,0 +1,5 @@
+{"step": 16, "event": "dead_expert_alert", "layers": [10], "layer_names": ["block10"], "min_fraction": 0.00792}
+{"step": 32, "event": "dead_expert_cleared", "layers": [], "layer_names": [], "min_fraction": 0.05481}
+{"step": 400, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/main/runs/A_serial_seed42/checkpoint.pt", "seconds": 18.563095159999648, "bytes_estimate": 5830149512, "deleted_old_first": false, "free_bytes_before": 61152296960}
+{"step": 800, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/main/runs/A_serial_seed42/checkpoint.pt", "seconds": 16.790537233999203, "bytes_estimate": 5830149512, "deleted_old_first": false, "free_bytes_before": 55419752448}
+{"step": 1200, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/main/runs/A_serial_seed42/checkpoint.pt", "seconds": 19.547144647000096, "bytes_estimate": 5830149512, "deleted_old_first": false, "free_bytes_before": 55419228160}

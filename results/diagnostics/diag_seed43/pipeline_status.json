@@ -1,0 +1,43 @@
+{
+  "phases": {
+    "env": {
+      "done": true,
+      "time": "2026-10-04 20:41:47",
+      "attention_backend": "sdpa_flash"
+    },
+    "dataset": {
+      "done": true,
+      "time": "2026-10-04 20:42:11"
+    },
+    "inspect": {
+      "done": true,
+      "time": "2026-10-04 20:42:14"
+    },
+    "probe": {
+      "done": true,
+      "time": "2026-10-04 20:42:14",
+      "micro_batch": 16
+    },
+    "train_A_serial": {
+      "done": true,
+      "time": "2026-10-04 20:53:49",
+      "exit_code": 0
+    },
+    "train_B_parallel": {
+      "done": true,
+      "time": "2026-10-04 21:05:23",
+      "exit_code": 0
+    },
+    "report": {
+      "done": true,
+      "time": "2026-10-04 21:05:28"
+    },
+    "package": {
+      "done": true,
+      "time": "2026-10-04 21:05:29",
+      "zip": "/content/moe_fusion_runs/moe_fusion_diag_seed43_results.zip"
+    }
+  },
+  "attention_backend": "sdpa_flash",
+  "micro_batch": 16
+}

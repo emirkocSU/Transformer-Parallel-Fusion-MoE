@@ -1,0 +1,5 @@
+{"step": 16, "event": "dead_expert_alert", "layers": [14], "layer_names": ["fusion_after_block11"], "min_fraction": 0.01015}
+{"step": 32, "event": "dead_expert_cleared", "layers": [], "layer_names": [], "min_fraction": 0.07684}
+{"step": 400, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/main/runs/C_parallel_fusion_samewidth_seed42/checkpoint.pt", "seconds": 18.31152781700075, "bytes_estimate": 7104418244, "deleted_old_first": false, "free_bytes_before": 63378792448}
+{"step": 800, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/main/runs/C_parallel_fusion_samewidth_seed42/checkpoint.pt", "seconds": 19.81842331200096, "bytes_estimate": 7104418244, "deleted_old_first": false, "free_bytes_before": 56371957760}
+{"step": 1200, "event": "checkpoint_saved", "path": "/content/moe_fusion_runs/main/runs/C_parallel_fusion_samewidth_seed42/checkpoint.pt", "seconds": 19.68040720099998, "bytes_estimate": 7104418244, "deleted_old_first": false, "free_bytes_before": 56371392512}

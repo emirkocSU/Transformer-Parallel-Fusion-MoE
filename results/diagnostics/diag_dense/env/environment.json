@@ -1,0 +1,38 @@
+{
+  "python": "3.13.15",
+  "platform": "Linux-6.6.122+-x86_64-with-glibc2.39",
+  "torch": "2.11.0+cu130",
+  "numpy": "2.1.3",
+  "cuda_available": true,
+  "torch_cuda_version": "13.0",
+  "cudnn": 92700,
+  "cpu_count": 12,
+  "ram_total_gb": 89.63,
+  "ram_available_gb": 86.73,
+  "disk_free_gb": 69.17,
+  "gpu_name": "NVIDIA A100-SXM4-40GB",
+  "gpu_total_memory_gb": 42.41,
+  "gpu_compute_capability": "8.0",
+  "gpu_count": 1,
+  "bf16_supported": true,
+  "flash_sdp_enabled": true,
+  "mem_efficient_sdp_enabled": true,
+  "math_sdp_enabled": true,
+  "tf32_matmul": false,
+  "float32_matmul_precision": "highest",
+  "nvidia_smi_query": "580.82.07, NVIDIA A100-SXM4-40GB, 40960 MiB, 1410 MHz",
+  "flash_attn_package": null,
+  "numerics": {
+    "allow_tf32_matmul": false,
+    "allow_tf32_cudnn": false,
+    "float32_matmul_precision": "highest",
+    "autocast_dtype": "bfloat16",
+    "note": "BF16 autocast for matmuls; FP32 master weights; FP32 router, norms, softmax/CE."
+  },
+  "moe_backend": {
+    "selected": "reference",
+    "reason": "pre-registered correctness reference; no external MoE package is installed (MegaBlocks/grouped-GEMM builds are fragile on Colab). The in-repo padded_bmm backend is only benchmarked, never used for the primary comparison."
+  },
+  "warnings": [],
+  "errors": []
+}
